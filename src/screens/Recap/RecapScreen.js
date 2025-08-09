@@ -11,15 +11,88 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../../components';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
+import { formatTime, formatPrice } from '../../utils/helpers';
 
 const RecapScreen = ({ route, navigation }) => {
-  const { trip, selectedSeats, totalPrice } = route.params;
+  const { 
+    trip, 
+    outboundTrip, 
+    returnTrip, 
+    selectedSeats, 
+    returnSelectedSeats,
+    totalPrice, 
+    searchParams 
+  } = route.params;
   const [loading, setLoading] = useState(false);
 
-  console.log('RecapScreen - Data received:', { trip, selectedSeats, totalPrice });
+  // Déterminer si c'est un aller-retour
+  const isRoundTrip = outboundTrip && returnTrip;
+  const mainTrip = isRoundTrip ? outboundTrip : trip;
+
+  console.log('RecapScreen - Data received:', { 
+    trip, 
+    outboundTrip, 
+    returnTrip, 
+    selectedSeats, 
+    returnSelectedSeats,
+    totalPrice, 
+    isRoundTrip 
+  });
+
+  console.log('RecapScreen - VIP Status:', {
+    'outboundTrip?.is_vip': outboundTrip?.is_vip,
+    'returnTrip?.is_vip': returnTrip?.is_vip,
+    'trip?.is_vip': trip?.is_vip,
+    'selectedSeats length': selectedSeats?.length,
+    'returnSelectedSeats length': returnSelectedSeats?.length
+  });
+
+  // Fonction pour calculer le nombre de passagers
+  const getPassengerCount = () => {
+    // Pour les trajets VIP, on utilise le nombre de sièges sélectionnés
+    if (selectedSeats && Array.isArray(selectedSeats) && selectedSeats.length > 0) {
+      return selectedSeats.length;
+    }
+    // Pour les trajets CLASSIC, on utilise les paramètres de recherche
+    return searchParams?.passengers || searchParams?.passagers || searchParams?.nbPassengers || 1;
+  };
+
+  const getReturnPassengerCount = () => {
+    // Pour les trajets VIP retour, on utilise le nombre de sièges sélectionnés
+    if (returnSelectedSeats && Array.isArray(returnSelectedSeats) && returnSelectedSeats.length > 0) {
+      return returnSelectedSeats.length;
+    }
+    // Pour les trajets CLASSIC, on utilise les paramètres de recherche
+    return searchParams?.passengers || searchParams?.passagers || searchParams?.nbPassengers || 1;
+  };
+
+  const calculateTotalPrice = () => {
+    if (isRoundTrip) {
+      const outboundPassengers = getPassengerCount();
+      const returnPassengers = getReturnPassengerCount();
+      return (outboundTrip?.prix || 0) * outboundPassengers + (returnTrip?.prix || 0) * returnPassengers;
+    }
+    const passengers = getPassengerCount();
+    return (trip?.prix || totalPrice || 0) * passengers;
+  };
 
   const handlePayment = () => {
-    navigation.navigate('Payment', { trip, selectedSeats, totalPrice });
+    const paymentData = isRoundTrip ? {
+      outboundTrip,
+      returnTrip,
+      selectedSeats,
+      returnSelectedSeats,
+      totalPrice: calculateTotalPrice(),
+      isRoundTrip: true,
+      searchParams
+    } : {
+      trip,
+      selectedSeats,
+      totalPrice: calculateTotalPrice(),
+      searchParams
+    };
+
+    navigation.navigate('Payment', paymentData);
   };
 
   return (
@@ -34,47 +107,162 @@ const RecapScreen = ({ route, navigation }) => {
       </View>
 
       <ScrollView style={styles.content}>
-        {/* Détails du voyage */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Détails du voyage</Text>
-          
-          <View style={styles.tripCard}>
-            <View style={styles.routeContainer}>
-              <View style={styles.cityInfo}>
-                <Text style={styles.time}>{trip?.heure_dep || 'N/A'}</Text>
-                <Text style={styles.city}>{trip?.ville_depart || 'Départ'}</Text>
-              </View>
+        {/* Détails du voyage aller */}
+        {isRoundTrip ? (
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Trajet aller</Text>
               
-              <View style={styles.arrow}>
-                <Ionicons name="arrow-forward" size={20} color={COLORS.primary} />
-              </View>
-              
-              <View style={styles.cityInfo}>
-                <Text style={styles.time}>{trip?.heure_arr || 'N/A'}</Text>
-                <Text style={styles.city}>{trip?.ville_arrivee || 'Arrivée'}</Text>
+              <View style={styles.tripCard}>
+                <View style={styles.routeContainer}>
+                  <View style={styles.cityInfo}>
+                    <Text style={styles.time}>{formatTime(outboundTrip?.heure_dep) || 'N/A'}</Text>
+                    <Text style={styles.city}>{outboundTrip?.ville_depart || 'Départ'}</Text>
+                  </View>
+                  
+                  <View style={styles.arrow}>
+                    <Ionicons name="arrow-forward" size={20} color={COLORS.primary} />
+                  </View>
+                  
+                  <View style={styles.cityInfo}>
+                    <Text style={styles.time}>{formatTime(outboundTrip?.heure_arr) || 'N/A'}</Text>
+                    <Text style={styles.city}>{outboundTrip?.ville_arrivee || 'Arrivée'}</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.busInfo}>
+                  <Ionicons name="bus" size={16} color={COLORS.primary} />
+                  <Text style={styles.busType}>
+                    {outboundTrip?.is_vip ? 'VIP' : 'CLASSIC'}
+                  </Text>
+                  <Text style={styles.price}>
+                    {((outboundTrip?.prix || 0) * getPassengerCount()).toLocaleString()} FCFA
+                  </Text>
+                </View>
               </View>
             </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Trajet retour</Text>
+              
+              <View style={styles.tripCard}>
+                <View style={styles.routeContainer}>
+                  <View style={styles.cityInfo}>
+                    <Text style={styles.time}>{formatTime(returnTrip?.heure_dep) || 'N/A'}</Text>
+                    <Text style={styles.city}>{returnTrip?.ville_depart || 'Départ'}</Text>
+                  </View>
+                  
+                  <View style={styles.arrow}>
+                    <Ionicons name="arrow-forward" size={20} color={COLORS.primary} />
+                  </View>
+                  
+                  <View style={styles.cityInfo}>
+                    <Text style={styles.time}>{formatTime(returnTrip?.heure_arr) || 'N/A'}</Text>
+                    <Text style={styles.city}>{returnTrip?.ville_arrivee || 'Arrivée'}</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.busInfo}>
+                  <Ionicons name="bus" size={16} color={COLORS.primary} />
+                  <Text style={styles.busType}>
+                    {returnTrip?.is_vip ? 'VIP' : 'CLASSIC'}
+                  </Text>
+                  <Text style={styles.price}>
+                    {((returnTrip?.prix || 0) * getReturnPassengerCount()).toLocaleString()} FCFA
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </>
+        ) : (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Détails du voyage</Text>
             
-            <View style={styles.busInfo}>
-              <Ionicons name="bus" size={16} color={COLORS.primary} />
-              <Text style={styles.busType}>
-                {trip?.is_vip ? 'VIP' : 'STANDARD'}
-              </Text>
+            <View style={styles.tripCard}>
+              <View style={styles.routeContainer}>
+                <View style={styles.cityInfo}>
+                  <Text style={styles.time}>{formatTime(trip?.heure_dep) || 'N/A'}</Text>
+                  <Text style={styles.city}>{trip?.ville_depart || 'Départ'}</Text>
+                </View>
+                
+                <View style={styles.arrow}>
+                  <Ionicons name="arrow-forward" size={20} color={COLORS.primary} />
+                </View>
+                
+                <View style={styles.cityInfo}>
+                  <Text style={styles.time}>{formatTime(trip?.heure_arr) || 'N/A'}</Text>
+                  <Text style={styles.city}>{trip?.ville_arrivee || 'Arrivée'}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.busInfo}>
+                <Ionicons name="bus" size={16} color={COLORS.primary} />
+                <Text style={styles.busType}>
+                  {trip?.is_vip ? 'VIP' : 'CLASSIC'}
+                </Text>
+                <Text style={styles.price}>
+                  {((trip?.prix || 0) * getPassengerCount()).toLocaleString()} FCFA
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
+        )}
 
-        {/* Sièges sélectionnés */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sièges sélectionnés</Text>
-          
-          {selectedSeats?.map((seat, index) => (
-            <View key={seat.id} style={styles.seatItem}>
-              <Text style={styles.seatNumber}>Siège {seat.seat_number}</Text>
-              <Text style={styles.seatPrice}>{trip?.prix || 4200} FCFA</Text>
+        {/* Sièges sélectionnés pour les trajets VIP */}
+        {isRoundTrip && outboundTrip && returnTrip ? (
+          <>
+            {/* Sièges aller VIP */}
+            {selectedSeats && selectedSeats.length > 0 && outboundTrip?.is_vip && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>🪑 Sièges VIP - Trajet aller</Text>
+                
+                {selectedSeats.map((seat, index) => (
+                  <View key={seat.id || index} style={styles.seatItem}>
+                    <View>
+                      <Text style={styles.seatNumber}>Siège {seat.seat_number || seat.number || (index + 1)}</Text>
+                      <Text style={styles.seatPassenger}>Passager {index + 1}</Text>
+                    </View>
+                    <Text style={styles.seatPrice}>Inclus</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Sièges retour VIP */}
+            {returnSelectedSeats && returnSelectedSeats.length > 0 && returnTrip?.is_vip && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>🪑 Sièges VIP - Trajet retour</Text>
+                
+                {returnSelectedSeats.map((seat, index) => (
+                  <View key={seat.id || index} style={styles.seatItem}>
+                    <View>
+                      <Text style={styles.seatNumber}>Siège {seat.seat_number || seat.number || (index + 1)}</Text>
+                      <Text style={styles.seatPassenger}>Passager {index + 1}</Text>
+                    </View>
+                    <Text style={styles.seatPrice}>Inclus</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </>
+        ) : (
+          /* Sièges pour trajet simple VIP */
+          selectedSeats && selectedSeats.length > 0 && trip?.is_vip && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>🪑 Sièges VIP sélectionnés</Text>
+              
+              {selectedSeats.map((seat, index) => (
+                <View key={seat.id || index} style={styles.seatItem}>
+                  <View>
+                    <Text style={styles.seatNumber}>Siège {seat.seat_number || seat.number || (index + 1)}</Text>
+                    <Text style={styles.seatPassenger}>Passager {index + 1}</Text>
+                  </View>
+                  <Text style={styles.seatPrice}>Inclus</Text>
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
+          )
+        )}
 
         {/* Services inclus */}
         {trip?.trip_services && (
@@ -111,21 +299,42 @@ const RecapScreen = ({ route, navigation }) => {
           <Text style={styles.sectionTitle}>Détail des prix</Text>
           
           <View style={styles.priceBreakdown}>
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>
-                {selectedSeats?.length || 0} billet(s) × {trip?.prix || 4200} FCFA
-              </Text>
-              <Text style={styles.priceValue}>
-                {((selectedSeats?.length || 0) * (trip?.prix || 4200)).toLocaleString()} FCFA
-              </Text>
-            </View>
+            {isRoundTrip ? (
+              <>
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>
+                    Trajet aller ({getPassengerCount()} passager{getPassengerCount() > 1 ? 's' : ''})
+                  </Text>
+                  <Text style={styles.priceValue}>
+                    {((outboundTrip?.prix || 0) * getPassengerCount()).toLocaleString()} FCFA
+                  </Text>
+                </View>
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>
+                    Trajet retour ({getReturnPassengerCount()} passager{getReturnPassengerCount() > 1 ? 's' : ''})
+                  </Text>
+                  <Text style={styles.priceValue}>
+                    {((returnTrip?.prix || 0) * getReturnPassengerCount()).toLocaleString()} FCFA
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>
+                  {getPassengerCount()} billet{getPassengerCount() > 1 ? 's' : ''} × {trip?.prix || 0} FCFA
+                </Text>
+                <Text style={styles.priceValue}>
+                  {(getPassengerCount() * (trip?.prix || 0)).toLocaleString()} FCFA
+                </Text>
+              </View>
+            )}
             
             <View style={styles.divider} />
             
             <View style={styles.priceRow}>
               <Text style={styles.totalLabel}>Total à payer</Text>
               <Text style={styles.totalValue}>
-                {totalPrice?.toLocaleString() || '0'} FCFA
+                {calculateTotalPrice().toLocaleString()} FCFA
               </Text>
             </View>
           </View>
@@ -231,6 +440,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.primary,
+    flex: 1,
+  },
+
+  price: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text.primary,
   },
   
   seatItem: {
@@ -247,6 +463,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: COLORS.text.primary,
+  },
+  
+  seatPassenger: {
+    fontSize: 14,
+    color: COLORS.text.secondary,
+    fontStyle: 'italic',
+    marginTop: 2,
   },
   
   seatPrice: {

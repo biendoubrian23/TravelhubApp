@@ -22,6 +22,7 @@ const HomeScreen = ({ navigation }) => {
   const [showDeparture, setShowDeparture] = useState(false)
   const [showArrival, setShowArrival] = useState(false)
   const [showCalendar, setShowCalendar] = useState(false)
+  const [showReturnCalendar, setShowReturnCalendar] = useState(false)
   const [showPassengers, setShowPassengers] = useState(false)
 
   const handleCitySelect = (city, type) => {
@@ -39,6 +40,19 @@ const HomeScreen = ({ navigation }) => {
     setShowCalendar(false)
   }
 
+  const handleReturnDateSelect = (date) => {
+    const selectedDate = new Date(date.dateString)
+    const departureDate = new Date(searchParams.date)
+    
+    if (selectedDate <= departureDate) {
+      Alert.alert('Erreur', 'La date de retour doit être après la date de départ')
+      return
+    }
+    
+    setSearchParams({ returnDate: selectedDate })
+    setShowReturnCalendar(false)
+  }
+
   const handlePassengerChange = (count) => {
     setSearchParams({ passengers: count })
     setShowPassengers(false)
@@ -52,6 +66,11 @@ const HomeScreen = ({ navigation }) => {
     
     if (searchParams.departure === searchParams.arrival) {
       Alert.alert('Erreur', 'La ville de départ et d\'arrivée doivent être différentes')
+      return
+    }
+
+    if (searchParams.isRoundTrip && !searchParams.returnDate) {
+      Alert.alert('Erreur', 'Veuillez sélectionner une date de retour')
       return
     }
 
@@ -95,7 +114,7 @@ const HomeScreen = ({ navigation }) => {
     <Modal visible={showPassengers} animationType="slide" presentationStyle="pageSheet">
       <SafeAreaView style={styles.modalContainer}>
         <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Nombre de passagers</Text>
+          <Text style={styles.modalTitle}>Nombre de voyageurs</Text>
           <TouchableOpacity onPress={() => setShowPassengers(false)}>
             <Ionicons name="close" size={24} color={COLORS.text.primary} />
           </TouchableOpacity>
@@ -115,7 +134,7 @@ const HomeScreen = ({ navigation }) => {
                 styles.passengerText,
                 searchParams.passengers === count && styles.passengerTextSelected
               ]}>
-                {count} {count === 1 ? 'passager' : 'passagers'}
+                {count} {count === 1 ? 'voyageur' : 'voyageurs'}
               </Text>
             </TouchableOpacity>
           ))}
@@ -142,19 +161,19 @@ const HomeScreen = ({ navigation }) => {
               onPress={() => setShowDeparture(true)}
             >
               <View style={styles.citySelectorContent}>
-                <Text style={styles.cityLabel}>Départ</Text>
+                <Text style={styles.cityLabel}>De</Text>
                 <Text style={[
                   styles.cityValue,
                   !searchParams.departure && styles.placeholder
                 ]}>
-                  {searchParams.departure || 'Choisir une ville'}
+                  {searchParams.departure || 'Départ'}
                 </Text>
               </View>
               <Ionicons name="location" size={20} color={COLORS.primary} />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.swapButton} onPress={swapCities}>
-              <Ionicons name="swap-vertical" size={20} color={COLORS.text.secondary} />
+              <Ionicons name="swap-vertical" size={20} color={COLORS.text.white} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -162,50 +181,81 @@ const HomeScreen = ({ navigation }) => {
               onPress={() => setShowArrival(true)}
             >
               <View style={styles.citySelectorContent}>
-                <Text style={styles.cityLabel}>Arrivée</Text>
+                <Text style={styles.cityLabel}>Vers</Text>
                 <Text style={[
                   styles.cityValue,
                   !searchParams.arrival && styles.placeholder
                 ]}>
-                  {searchParams.arrival || 'Choisir une ville'}
+                  {searchParams.arrival || 'Arrivée'}
                 </Text>
               </View>
               <Ionicons name="location" size={20} color={COLORS.primary} />
             </TouchableOpacity>
           </View>
 
-          {/* Date and Passengers */}
-          <View style={styles.optionsContainer}>
+          {/* Date Options */}
+          <View style={styles.dateContainer}>
             <TouchableOpacity
-              style={styles.optionSelector}
+              style={[styles.dateSelector, { flex: searchParams.isRoundTrip ? 1 : 2 }]}
               onPress={() => setShowCalendar(true)}
             >
-              <Ionicons name="calendar" size={20} color={COLORS.primary} />
               <View style={styles.optionContent}>
-                <Text style={styles.optionLabel}>Date</Text>
+                <Text style={styles.optionLabel}>Aller</Text>
                 <Text style={styles.optionValue}>
-                  {formatDate(searchParams.date)}
+                  {formatDate(searchParams.date, 'short')}
                 </Text>
               </View>
+              <Ionicons name="calendar" size={20} color={COLORS.primary} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.optionSelector}
-              onPress={() => setShowPassengers(true)}
+              style={[styles.dateSelector, { flex: 1 }]}
+              onPress={() => {
+                if (!searchParams.isRoundTrip) {
+                  // Activer le mode aller-retour
+                  setSearchParams({ 
+                    isRoundTrip: true,
+                    returnDate: new Date(searchParams.date.getTime() + 24 * 60 * 60 * 1000) // Lendemain par défaut
+                  })
+                } else {
+                  setShowReturnCalendar(true)
+                }
+              }}
             >
-              <Ionicons name="person" size={20} color={COLORS.primary} />
               <View style={styles.optionContent}>
-                <Text style={styles.optionLabel}>Passagers</Text>
-                <Text style={styles.optionValue}>
-                  {searchParams.passengers} {searchParams.passengers === 1 ? 'passager' : 'passagers'}
+                <Text style={styles.optionLabel}>Retour</Text>
+                <Text style={[styles.optionValue, !searchParams.isRoundTrip && styles.addReturnText]}>
+                  {searchParams.isRoundTrip && searchParams.returnDate 
+                    ? formatDate(searchParams.returnDate, 'short')
+                    : 'Ajouter'
+                  }
                 </Text>
               </View>
+              {searchParams.isRoundTrip ? (
+                <Ionicons name="calendar" size={20} color={COLORS.primary} />
+              ) : (
+                <Ionicons name="add" size={20} color={COLORS.success} />
+              )}
             </TouchableOpacity>
           </View>
 
+          {/* Passengers */}
+          <TouchableOpacity
+            style={styles.passengerSelector}
+            onPress={() => setShowPassengers(true)}
+          >
+            <View style={styles.optionContent}>
+              <Text style={styles.optionLabel}>Voyageurs</Text>
+              <Text style={styles.optionValue}>
+                {searchParams.passengers} {searchParams.passengers === 1 ? 'adulte' : 'adultes'}
+              </Text>
+            </View>
+            <Ionicons name="person" size={20} color={COLORS.primary} />
+          </TouchableOpacity>
+
           {/* Search Button */}
           <Button
-            title="Rechercher"
+            title="RECHERCHER"
             onPress={handleSearch}
             style={styles.searchButton}
             size="large"
@@ -261,7 +311,7 @@ const HomeScreen = ({ navigation }) => {
       <Modal visible={showCalendar} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Choisir une date</Text>
+            <Text style={styles.modalTitle}>Choisir une date d'aller</Text>
             <TouchableOpacity onPress={() => setShowCalendar(false)}>
               <Ionicons name="close" size={24} color={COLORS.text.primary} />
             </TouchableOpacity>
@@ -278,6 +328,40 @@ const HomeScreen = ({ navigation }) => {
             minDate={new Date().toISOString().split('T')[0]}
             theme={{
               selectedDayBackgroundColor: COLORS.primary,
+              todayTextColor: COLORS.primary,
+              arrowColor: COLORS.primary,
+            }}
+          />
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={showReturnCalendar} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Choisir une date de retour</Text>
+            <TouchableOpacity onPress={() => setShowReturnCalendar(false)}>
+              <Ionicons name="close" size={24} color={COLORS.text.primary} />
+            </TouchableOpacity>
+          </View>
+          
+          <Calendar
+            onDayPress={handleReturnDateSelect}
+            markedDates={{
+              [searchParams.date.toISOString().split('T')[0]]: {
+                marked: true,
+                dotColor: COLORS.primary,
+                selectedColor: 'transparent'
+              },
+              ...(searchParams.returnDate && {
+                [searchParams.returnDate.toISOString().split('T')[0]]: {
+                  selected: true,
+                  selectedColor: COLORS.success
+                }
+              })
+            }}
+            minDate={new Date(searchParams.date.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+            theme={{
+              selectedDayBackgroundColor: COLORS.success,
               todayTextColor: COLORS.primary,
               arrowColor: COLORS.primary,
             }}
@@ -377,14 +461,60 @@ const styles = StyleSheet.create({
 
   swapButton: {
     alignSelf: 'center',
-    padding: SPACING.xs,
+    padding: SPACING.sm,
     marginVertical: SPACING.xs,
+    backgroundColor: COLORS.primary,
+    borderRadius: 25, // Cercle parfait
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
 
   optionsContainer: {
     flexDirection: 'row',
     marginBottom: SPACING.lg,
     gap: SPACING.sm,
+  },
+
+  dateContainer: {
+    flexDirection: 'row',
+    marginBottom: SPACING.md,
+    gap: SPACING.sm,
+  },
+
+  dateSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+
+  passengerSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.sm,
+    marginBottom: SPACING.lg,
+  },
+
+  addReturnText: {
+    color: COLORS.success,
+    fontWeight: '600',
   },
 
   optionSelector: {

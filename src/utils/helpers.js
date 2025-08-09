@@ -18,6 +18,16 @@ export const formatDate = (date, format = 'default') => {
     return `${day}/${month} à ${hours}:${minutes}`
   }
   
+  // Format court pour l'écran d'accueil
+  if (format === 'short') {
+    const options = {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'long'
+    }
+    return dateObj.toLocaleDateString('fr-FR', options)
+  }
+  
   const options = {
     weekday: 'short',
     day: 'numeric',
@@ -32,17 +42,26 @@ export const formatDate = (date, format = 'default') => {
 export const formatTime = (time) => {
   if (!time) return ''
   
-  // Si c'est déjà au format HH:MM
+  // Si c'est déjà au format HH:MM ou H:MM
   if (typeof time === 'string' && time.includes(':')) {
-    return time
+    const [hours, minutes] = time.split(':')
+    return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`
   }
   
   // Si c'est un objet Date
   if (time instanceof Date) {
     return time.toLocaleTimeString('fr-FR', {
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      hour12: false
     })
+  }
+  
+  // Si c'est un nombre (heures en format décimal)
+  if (typeof time === 'number') {
+    const hours = Math.floor(time)
+    const minutes = Math.round((time - hours) * 60)
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
   }
   
   return time

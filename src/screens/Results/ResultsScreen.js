@@ -14,20 +14,70 @@ import { TripCard } from '../../components'
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants'
 import { useSearchStore, useBookingStore } from '../../store'
 import { tripService } from '../../services/supabase'
-import { formatDate, formatPrice } from '../../utils/helpers'
+import { mockTripService } from '../../services/mockTripService'
+import { formatDate, formatPrice, formatTime } from '../../utils/helpers'
 
-const ResultsScreen = ({ navigation }) => {
-  const { searchParams, searchResults, setSearchResults, isSearching, setIsSearching, setSearchParams } = useSearchStore()
-  const { setCurrentTrip } = useBookingStore()
+const ResultsScreen = ({ navigation, route }) => {
+  const { 
+    searchParams, 
+    searchResults, 
+    returnSearchResults,
+    setSearchResults, 
+    setReturnSearchResults,
+    isSearching, 
+    setIsSearching, 
+    setSearchParams 
+  } = useSearchStore()
+  const { 
+    setCurrentTrip, 
+    setReturnTrip, 
+    bookingStep, 
+    setBookingStep,
+    currentTrip,
+    returnTrip
+  } = useBookingStore()
   const [selectedFilter, setSelectedFilter] = useState('all')
   const [dateCarousel, setDateCarousel] = useState([])
   const [isLoadingNewDate, setIsLoadingNewDate] = useState(false)
-  const [localSearchParams, setLocalSearchParams] = useState(searchParams) // État local pour éviter les re-renders
+  const [localSearchParams, setLocalSearchParams] = useState(searchParams)
+  const [showingReturnTrips, setShowingReturnTrips] = useState(false)
+  const [outboundSeats, setOutboundSeats] = useState([]) // Pour stocker les sièges aller sélectionnés
 
   useEffect(() => {
     generateDateCarousel()
     searchTrips()
-  }, [])
+    
+    // Vérifier si on revient de SeatSelection pour choisir le trajet retour
+    if (route.params?.continueReturnSelection) {
+      setShowingReturnTrips(true)
+      setBookingStep('return')
+      if (route.params?.outboundSeats) {
+        setOutboundSeats(route.params.outboundSeats)
+      }
+    } else {
+      // Réinitialiser l'état si on arrive d'une nouvelle recherche
+      setShowingReturnTrips(false)
+      setBookingStep('outbound')
+      setOutboundSeats([])
+    }
+  }, [route.params?.continueReturnSelection])
+
+  // Régénérer le calendrier quand on passe du mode aller au mode retour
+  useEffect(() => {
+    generateDateCarousel()
+    // Mettre à jour la date locale selon le mode
+    if (showingReturnTrips && searchParams.returnDate) {
+      setLocalSearchParams(prev => ({
+        ...prev,
+        date: searchParams.returnDate
+      }))
+    } else {
+      setLocalSearchParams(prev => ({
+        ...prev,
+        date: searchParams.date
+      }))
+    }
+  }, [showingReturnTrips])
 
   // Synchroniser les paramètres locaux avec le store seulement quand nécessaire
   useEffect(() => {
@@ -36,7 +86,8 @@ const ResultsScreen = ({ navigation }) => {
 
   const generateDateCarousel = () => {
     const dates = []
-    const baseDate = new Date(searchParams.date)
+    // Utiliser la date de retour si on affiche les trajets retour, sinon la date de départ
+    const baseDate = new Date(showingReturnTrips ? searchParams.returnDate : searchParams.date)
     const today = new Date()
     today.setHours(0, 0, 0, 0) // Reset time to compare only dates
     
@@ -71,88 +122,157 @@ const ResultsScreen = ({ navigation }) => {
   const searchTrips = async () => {
     setIsSearching(true)
     try {
-      // Simulation de données pour la démo
-      const mockTrips = [
-        {
-          id: '1',
-          ville_depart: searchParams.departure,
-          ville_arrivee: searchParams.arrival,
-          date: searchParams.date.toISOString().split('T')[0],
-          heure_dep: '06:47',
-          heure_arr: '12:37',
-          prix: 3500,
-          is_vip: false,
-          agencies: { nom: 'Finexs Voyage' },
-          trip_services: [{ wifi: true, repas: false, clim: true }]
-        },
-        {
-          id: '2',
-          ville_depart: searchParams.departure,
-          ville_arrivee: searchParams.arrival,
-          date: searchParams.date.toISOString().split('T')[0],
-          heure_dep: '08:25',
-          heure_arr: '13:13',
-          prix: 4200,
-          is_vip: true,
-          agencies: { nom: 'Garanti Express' },
-          trip_services: [{ wifi: true, repas: true, clim: true }]
-        },
-        {
-          id: '3',
-          ville_depart: searchParams.departure,
-          ville_arrivee: searchParams.arrival,
-          date: searchParams.date.toISOString().split('T')[0],
-          heure_dep: '10:15',
-          heure_arr: '15:45',
-          prix: 3200,
-          is_vip: false,
-          agencies: { nom: 'Touristique Express' },
-          trip_services: [{ wifi: false, repas: false, clim: true }]
-        },
-        {
-          id: '4',
-          ville_depart: searchParams.departure,
-          ville_arrivee: searchParams.arrival,
-          date: searchParams.date.toISOString().split('T')[0],
-          heure_dep: '14:30',
-          heure_arr: '19:20',
-          prix: 3800,
-          is_vip: true,
-          agencies: { nom: 'Central Voyages' },
-          trip_services: [{ wifi: true, repas: true, clim: true }]
+      // Utiliser le service de mock pour générer des trajets pour les 5 prochains jours
+      const trips = mockTripService.generateTripsForDays(searchParams, 5)
+      setSearchResults(trips)
+      
+      // Si c'est un aller-retour, générer aussi les trajets de retour
+      if (searchParams.isRoundTrip && searchParams.returnDate) {
+        const returnSearchParams = {
+          departure: searchParams.arrival,
+          arrival: searchParams.departure
         }
-      ]
-
-      setSearchResults(mockTrips)
+        const returnTrips = mockTripService.generateTripsForDays(returnSearchParams, 5)
+        setReturnSearchResults(returnTrips)
+      }
+      
     } catch (error) {
+      console.error('Erreur lors de la recherche:', error)
       Alert.alert('Erreur', 'Impossible de charger les trajets')
-      console.error('Search error:', error)
     } finally {
       setIsSearching(false)
     }
   }
 
-  const filteredTrips = searchResults.filter(trip => {
+  const getCurrentTrips = () => {
+    if (showingReturnTrips) {
+      return returnSearchResults
+    }
+    return searchResults
+  }
+
+  const filteredTrips = getCurrentTrips().filter(trip => {
     if (selectedFilter === 'classic') return !trip.is_vip
     if (selectedFilter === 'vip') return trip.is_vip
     return true
   })
 
   const handleTripSelect = (trip) => {
-    // Stocker le trajet sélectionné dans le store pour les autres écrans
-    setCurrentTrip(trip)
-    // Passer aussi le trajet dans les paramètres de navigation pour éviter les problèmes
-    navigation.navigate('Details', { 
-      tripId: trip.id,
-      trip: trip,
-      searchParams: localSearchParams, // Utiliser les paramètres locaux actuels
-      allTrips: searchResults // Passer tous les résultats pour permettre la comparaison
-    })
+    if (!searchParams.isRoundTrip) {
+      // Trajet simple - aller directement au détail ou à la sélection de siège
+      setCurrentTrip(trip)
+      if (trip.is_vip) {
+        // Pour les trajets VIP, aller à la sélection de siège
+        navigation.navigate('SeatSelection', { 
+          trip: trip,
+          searchParams: localSearchParams
+        })
+      } else {
+        // Pour les trajets classic, aller directement au récapitulatif
+        navigation.navigate('Recap', { 
+          trip: trip,
+          searchParams: localSearchParams
+        })
+      }
+    } else {
+      // Trajet aller-retour
+      if (!showingReturnTrips) {
+        // Sélection du trajet aller
+        setCurrentTrip(trip)
+        setBookingStep('return')
+        
+        // Si le trajet aller est VIP, aller directement à la sélection de siège
+        if (trip.is_vip) {
+          navigation.navigate('SeatSelection', { 
+            outboundTrip: trip,
+            returnTrip: null, // Pas encore de trajet retour
+            searchParams: localSearchParams,
+            showReturnSelection: true // Indiquer qu'on doit revenir pour le retour
+          })
+        } else {
+          // Si le trajet aller n'est pas VIP, passer au choix du retour
+          setShowingReturnTrips(true)
+        }
+      } else {
+        // Sélection du trajet retour
+        setReturnTrip(trip)
+        setBookingStep('seats')
+        
+        // Nouvelle logique : naviguer selon les types de trajets
+        const outboundIsVip = currentTrip.is_vip
+        const returnIsVip = trip.is_vip
+        
+        if (outboundIsVip && returnIsVip) {
+          // Les deux trajets sont VIP : sélection de sièges pour les deux
+          const navigationParams = { 
+            outboundTrip: currentTrip,
+            returnTrip: trip,
+            searchParams: localSearchParams
+          }
+          
+          if (outboundSeats.length > 0) {
+            navigationParams.preselectedOutboundSeats = outboundSeats
+          }
+          
+          navigation.navigate('SeatSelection', navigationParams)
+        } else if (outboundIsVip && !returnIsVip) {
+          // Seul le trajet aller est VIP
+          if (outboundSeats.length > 0) {
+            // Sièges aller déjà sélectionnés, aller au récapitulatif
+            navigation.navigate('Recap', { 
+              outboundTrip: currentTrip,
+              returnTrip: trip,
+              selectedSeats: outboundSeats,
+              returnSelectedSeats: [], // Pas de sièges à sélectionner pour le retour
+              searchParams: localSearchParams
+            })
+          } else {
+            // Sélection de sièges pour l'aller seulement
+            navigation.navigate('SeatSelection', { 
+              outboundTrip: currentTrip,
+              returnTrip: trip,
+              searchParams: localSearchParams,
+              vipTripOnly: 'outbound' // Indiquer que seul l'aller nécessite des sièges
+            })
+          }
+        } else if (!outboundIsVip && returnIsVip) {
+          // Seul le trajet retour est VIP : sélection de sièges pour le retour seulement
+          navigation.navigate('SeatSelection', { 
+            outboundTrip: currentTrip,
+            returnTrip: trip,
+            searchParams: localSearchParams,
+            vipTripOnly: 'return' // Indiquer que seul le retour nécessite des sièges
+          })
+        } else {
+          // Aucun trajet VIP : aller directement au récapitulatif
+          const recapParams = { 
+            outboundTrip: currentTrip,
+            returnTrip: trip,
+            searchParams: localSearchParams
+          }
+          
+          if (outboundSeats.length > 0) {
+            recapParams.preselectedOutboundSeats = outboundSeats
+          }
+          
+          navigation.navigate('Recap', recapParams)
+        }
+      }
+    }
+  }
+
+  const handleBackToOutbound = () => {
+    setShowingReturnTrips(false)
+    setBookingStep('outbound')
+    setReturnTrip(null)
   }
 
   const handleDateSelect = async (selectedDate) => {
+    // Utiliser la date appropriée selon le mode (aller ou retour)
+    const currentDate = showingReturnTrips ? searchParams.returnDate : searchParams.date
+    
     // Ne pas permettre de sélectionner la même date
-    if (selectedDate.toDateString() === localSearchParams.date.toDateString()) {
+    if (selectedDate.toDateString() === new Date(currentDate).toDateString()) {
       return
     }
     
@@ -161,19 +281,33 @@ const ResultsScreen = ({ navigation }) => {
       return
     }
     
-    console.log('Recherche pour la nouvelle date:', selectedDate.toISOString())
+    console.log('Recherche pour la nouvelle date:', selectedDate.toISOString(), 'Mode:', showingReturnTrips ? 'retour' : 'aller')
     setIsLoadingNewDate(true)
     
     try {
-      // Mettre à jour les paramètres locaux immédiatement
-      const newSearchParams = {
-        ...localSearchParams,
-        date: selectedDate
+      // Mettre à jour les paramètres selon le mode
+      if (showingReturnTrips) {
+        // Mode retour : mettre à jour la date de retour et les paramètres du store
+        const newSearchParams = {
+          ...searchParams,
+          returnDate: selectedDate
+        }
+        setSearchParams(newSearchParams)
+        
+        // Mettre à jour les paramètres locaux pour l'affichage
+        setLocalSearchParams({
+          ...localSearchParams,
+          date: selectedDate
+        })
+      } else {
+        // Mode aller : mettre à jour les paramètres locaux et le store
+        const newSearchParams = {
+          ...localSearchParams,
+          date: selectedDate
+        }
+        setLocalSearchParams(newSearchParams)
+        setSearchParams(newSearchParams)
       }
-      setLocalSearchParams(newSearchParams)
-      
-      // Mettre à jour le store seulement après la fin du processus
-      setSearchParams(newSearchParams)
       
       // Regénérer le carrousel avec la nouvelle date
       const dates = []
@@ -205,10 +339,30 @@ const ResultsScreen = ({ navigation }) => {
       
       setDateCarousel(dates)
       
-      // Simuler la recherche de nouveaux trajets
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Rechercher les nouveaux trajets selon le mode
+      if (showingReturnTrips) {
+        // Mode retour : rechercher les trajets retour pour la nouvelle date
+        const returnSearchParams = {
+          departure: searchParams.arrival,
+          arrival: searchParams.departure,
+          date: selectedDate
+        }
+        const returnTrips = mockTripService.generateTripsForDays(returnSearchParams, 1)
+        setReturnSearchResults(returnTrips)
+      } else {
+        // Mode aller : rechercher les trajets aller pour la nouvelle date  
+        const tripSearchParams = {
+          ...localSearchParams,
+          date: selectedDate
+        }
+        const trips = mockTripService.generateTripsForDays(tripSearchParams, 1)
+        setSearchResults(trips)
+      }
       
-      console.log('Recherche terminée pour:', selectedDate.toISOString())
+      // Simuler le délai de recherche
+      await new Promise(resolve => setTimeout(resolve, 800))
+      
+      console.log('Recherche terminée pour:', selectedDate.toISOString(), 'Mode:', showingReturnTrips ? 'retour' : 'aller')
       
     } catch (error) {
       console.error('Erreur lors de la recherche:', error)
@@ -256,18 +410,58 @@ const ResultsScreen = ({ navigation }) => {
       <View style={styles.routeHeader}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            if (showingReturnTrips) {
+              handleBackToOutbound()
+            } else {
+              navigation.goBack()
+            }
+          }}
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.text.primary} />
         </TouchableOpacity>
         
         <View style={styles.routeInfo}>
-          <Text style={styles.routeTitle}>
-            {localSearchParams.departure} → {localSearchParams.arrival}
-          </Text>
-          <Text style={styles.routeSubtitle}>
-            {formatDate(localSearchParams.date)} • {localSearchParams.passengers} {localSearchParams.passengers === 1 ? 'passager' : 'passagers'}
-          </Text>
+          {showingReturnTrips ? (
+            <>
+              <View style={styles.tripTypeIndicator}>
+                <View style={[styles.tripBadge, styles.returnBadge]}>
+                  <Ionicons name="arrow-back" size={16} color="#fff" />
+                  <Text style={styles.tripBadgeText}>RETOUR</Text>
+                </View>
+              </View>
+              <Text style={styles.routeTitle}>
+                {searchParams.arrival} → {searchParams.departure}
+              </Text>
+              <Text style={styles.routeSubtitle}>
+                Retour • {searchParams.returnDate ? formatDate(searchParams.returnDate) : ''} • {searchParams.passengers} {searchParams.passengers === 1 ? 'passager' : 'passagers'}
+              </Text>
+              {currentTrip && (
+                <View style={styles.selectedOutboundInfo}>
+                  <Text style={styles.selectedTripText}>
+                    ✓ Aller sélectionné: {formatTime(currentTrip.heure_dep)} - {formatPrice(currentTrip.prix)}
+                  </Text>
+                </View>
+              )}
+            </>
+          ) : (
+            <>
+              {searchParams.isRoundTrip && (
+                <View style={styles.tripTypeIndicator}>
+                  <View style={[styles.tripBadge, styles.outboundBadge]}>
+                    <Ionicons name="arrow-forward" size={16} color="#fff" />
+                    <Text style={styles.tripBadgeText}>ALLER</Text>
+                  </View>
+                </View>
+              )}
+              <Text style={styles.routeTitle}>
+                {localSearchParams.departure} → {localSearchParams.arrival}
+              </Text>
+              <Text style={styles.routeSubtitle}>
+                {searchParams.isRoundTrip ? 'Aller • ' : ''}{formatDate(localSearchParams.date)} • {localSearchParams.passengers} {localSearchParams.passengers === 1 ? 'passager' : 'passagers'}
+              </Text>
+            </>
+          )}
         </View>
 
         <TouchableOpacity style={styles.modifyButton}>
@@ -491,6 +685,48 @@ const styles = StyleSheet.create({
   resultsText: {
     fontSize: 14,
     color: COLORS.text.secondary,
+  },
+
+  selectedOutboundInfo: {
+    backgroundColor: COLORS.success,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.sm,
+    marginTop: SPACING.xs,
+  },
+
+  selectedTripText: {
+    fontSize: 12,
+    color: COLORS.text.white,
+    fontWeight: '500',
+  },
+
+  tripTypeIndicator: {
+    marginBottom: SPACING.xs,
+  },
+
+  tripBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.md,
+    alignSelf: 'flex-start',
+  },
+
+  outboundBadge: {
+    backgroundColor: COLORS.primary,
+  },
+
+  returnBadge: {
+    backgroundColor: '#FF6B35', // Orange pour le retour
+  },
+
+  tripBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: SPACING.xs,
   },
 
   listContent: {

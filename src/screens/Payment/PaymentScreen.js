@@ -15,7 +15,16 @@ import { Button } from '../../components';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
 
 const PaymentScreen = ({ route, navigation }) => {
-  const { trip, selectedSeats, totalPrice } = route.params;
+  const { 
+    trip, 
+    outboundTrip, 
+    returnTrip, 
+    selectedSeats, 
+    returnSelectedSeats, 
+    totalPrice, 
+    isRoundTrip,
+    searchParams 
+  } = route.params;
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -27,28 +36,46 @@ const PaymentScreen = ({ route, navigation }) => {
   const [cardName, setCardName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
 
-  console.log('PaymentScreen - Data received:', { trip, selectedSeats, totalPrice });
+  console.log('PaymentScreen - Data received:', { 
+    trip, 
+    outboundTrip, 
+    returnTrip, 
+    selectedSeats, 
+    returnSelectedSeats, 
+    totalPrice, 
+    isRoundTrip,
+    searchParams 
+  });
+  console.log('PaymentScreen - selectedSeats details:', selectedSeats);
+  console.log('PaymentScreen - returnSelectedSeats details:', returnSelectedSeats);
+  console.log('PaymentScreen - selectedSeats length:', selectedSeats?.length);
+  console.log('PaymentScreen - returnSelectedSeats length:', returnSelectedSeats?.length);
+  console.log('PaymentScreen - searchParams:', searchParams);
+  console.log('PaymentScreen - isRoundTrip:', isRoundTrip);
 
   const paymentMethods = [
     {
       id: 'orange_money',
       name: 'Orange Money',
       icon: 'phone-portrait',
-      color: '#FF7900',
+      color: '#FF6600', // Orange officiel
+      backgroundColor: '#FFF3E0',
       description: 'Paiement mobile Orange'
     },
     {
       id: 'mtn_momo',
       name: 'MTN Mobile Money',
       icon: 'phone-portrait',
-      color: '#FFCC00',
+      color: '#FFD700', // Jaune doré
+      backgroundColor: '#FFFDE7',
       description: 'Paiement mobile MTN'
     },
     {
       id: 'card',
       name: 'Carte bancaire',
       icon: 'card',
-      color: COLORS.primary,
+      color: '#2196F3', // Bleu
+      backgroundColor: '#E3F2FD',
       description: 'Visa, Mastercard'
     }
   ];
@@ -152,33 +179,153 @@ const PaymentScreen = ({ route, navigation }) => {
       </View>
 
       <ScrollView style={styles.content}>
-        {/* Résumé de la réservation */}
+        {/* Résumé simplifié */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Résumé de la réservation</Text>
-          
-          <View style={styles.bookingSummary}>
-            <Text style={styles.bookingReference}>
-              Réf: TH{Date.now().toString().slice(-6)}
-            </Text>
-            
-            <View style={styles.tripInfo}>
-              <Text style={styles.route}>
-                {trip?.ville_depart || trip?.departure_city || 'Départ'} → {trip?.ville_arrivee || trip?.arrival_city || 'Arrivée'}
-              </Text>
-              <Text style={styles.datetime}>
-                {trip?.departure_time 
-                  ? new Date(trip.departure_time).toLocaleDateString('fr-FR')
-                  : trip?.date_depart
-                  ? trip.date_depart
-                  : trip?.date
-                  ? new Date(trip.date).toLocaleDateString('fr-FR')
-                  : 'Date non spécifiée'} à {trip?.heure_dep || trip?.departure_time || 'Heure non spécifiée'}
-              </Text>
-              <Text style={styles.seat}>
-                {selectedSeats?.length || 0} siège(s) sélectionné(s)
-                {selectedSeats?.map(seat => ` ${seat.seat_number}`).join(',') || ''}
-              </Text>
-            </View>
+          <View style={styles.simpleSummary}>
+            {/* Affichage pour aller-retour */}
+            {isRoundTrip && outboundTrip && returnTrip ? (
+              <>
+                {/* Trajet aller */}
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>
+                    🛫 Aller: {outboundTrip?.ville_depart || outboundTrip?.departure_city || 'Départ'} → {outboundTrip?.ville_arrivee || outboundTrip?.arrival_city || 'Arrivée'}
+                  </Text>
+                  <Text style={styles.summarySeats}>
+                    {(() => {
+                      let seatCount = 0;
+                      if (selectedSeats) {
+                        if (Array.isArray(selectedSeats)) {
+                          seatCount = selectedSeats.length;
+                        } else if (typeof selectedSeats === 'object') {
+                          seatCount = Object.keys(selectedSeats).length;
+                        } else if (typeof selectedSeats === 'number') {
+                          seatCount = selectedSeats;
+                        }
+                      }
+                      // Si aucun siège n'est défini, on utilise le nombre de passagers depuis searchParams
+                      if (seatCount === 0) {
+                        seatCount = searchParams?.passengers || searchParams?.passagers || searchParams?.nbPassengers || 1;
+                      }
+                      return `${seatCount} siège${seatCount > 1 ? 's' : ''}`;
+                    })()}
+                  </Text>
+                </View>
+
+                {/* Sièges aller VIP */}
+                {selectedSeats && Array.isArray(selectedSeats) && selectedSeats.length > 0 && 
+                 (outboundTrip?.type === 'VIP' || outboundTrip?.bus_type === 'vip' || outboundTrip?.classe === 'VIP') && (
+                  <View style={styles.vipSeatsContainer}>
+                    <Text style={styles.vipSeatsTitle}>🪑 Sièges VIP aller :</Text>
+                    <View style={styles.seatsList}>
+                      {selectedSeats.map((seat, index) => (
+                        <View key={seat.id || index} style={styles.seatItem}>
+                          <Text style={styles.seatNumber}>
+                            Siège {seat.seat_number || seat.number || (index + 1)}
+                          </Text>
+                          <Text style={styles.seatPassenger}>
+                            Passager {index + 1}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Trajet retour */}
+                <View style={[styles.summaryRow, { marginTop: SPACING.md }]}>
+                  <Text style={styles.summaryLabel}>
+                    🛬 Retour: {returnTrip?.ville_depart || returnTrip?.departure_city || 'Départ'} → {returnTrip?.ville_arrivee || returnTrip?.arrival_city || 'Arrivée'}
+                  </Text>
+                  <Text style={styles.summarySeats}>
+                    {(() => {
+                      let seatCount = 0;
+                      if (returnSelectedSeats) {
+                        if (Array.isArray(returnSelectedSeats)) {
+                          seatCount = returnSelectedSeats.length;
+                        } else if (typeof returnSelectedSeats === 'object') {
+                          seatCount = Object.keys(returnSelectedSeats).length;
+                        } else if (typeof returnSelectedSeats === 'number') {
+                          seatCount = returnSelectedSeats;
+                        }
+                      }
+                      // Si aucun siège n'est défini, on utilise le nombre de passagers depuis searchParams
+                      if (seatCount === 0) {
+                        seatCount = searchParams?.passengers || searchParams?.passagers || searchParams?.nbPassengers || 1;
+                      }
+                      return `${seatCount} siège${seatCount > 1 ? 's' : ''}`;
+                    })()}
+                  </Text>
+                </View>
+
+                {/* Sièges retour VIP */}
+                {returnSelectedSeats && Array.isArray(returnSelectedSeats) && returnSelectedSeats.length > 0 && 
+                 (returnTrip?.type === 'VIP' || returnTrip?.bus_type === 'vip' || returnTrip?.classe === 'VIP') && (
+                  <View style={styles.vipSeatsContainer}>
+                    <Text style={styles.vipSeatsTitle}>🪑 Sièges VIP retour :</Text>
+                    <View style={styles.seatsList}>
+                      {returnSelectedSeats.map((seat, index) => (
+                        <View key={seat.id || index} style={styles.seatItem}>
+                          <Text style={styles.seatNumber}>
+                            Siège {seat.seat_number || seat.number || (index + 1)}
+                          </Text>
+                          <Text style={styles.seatPassenger}>
+                            Passager {index + 1}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Affichage pour trajet simple */}
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>
+                    {trip?.ville_depart || trip?.departure_city || 'Départ'} → {trip?.ville_arrivee || trip?.arrival_city || 'Arrivée'}
+                  </Text>
+                  <Text style={styles.summarySeats}>
+                    {(() => {
+                      let seatCount = 0;
+                      if (selectedSeats) {
+                        if (Array.isArray(selectedSeats)) {
+                          seatCount = selectedSeats.length;
+                        } else if (typeof selectedSeats === 'object') {
+                          seatCount = Object.keys(selectedSeats).length;
+                        } else if (typeof selectedSeats === 'number') {
+                          seatCount = selectedSeats;
+                        }
+                      }
+                      // Si aucun siège n'est défini, on utilise le nombre de passagers depuis searchParams
+                      if (seatCount === 0) {
+                        seatCount = searchParams?.passengers || searchParams?.passagers || searchParams?.nbPassengers || 1;
+                      }
+                      return `${seatCount} siège${seatCount > 1 ? 's' : ''}`;
+                    })()}
+                  </Text>
+                </View>
+
+                {/* Sièges VIP pour trajet simple */}
+                {selectedSeats && Array.isArray(selectedSeats) && selectedSeats.length > 0 && 
+                 (trip?.type === 'VIP' || trip?.bus_type === 'vip' || trip?.classe === 'VIP') && (
+                  <View style={styles.vipSeatsContainer}>
+                    <Text style={styles.vipSeatsTitle}>🪑 Sièges VIP sélectionnés :</Text>
+                    <View style={styles.seatsList}>
+                      {selectedSeats.map((seat, index) => (
+                        <View key={seat.id || index} style={styles.seatItem}>
+                          <Text style={styles.seatNumber}>
+                            Siège {seat.seat_number || seat.number || (index + 1)}
+                          </Text>
+                          <Text style={styles.seatPassenger}>
+                            Passager {index + 1}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </>
+            )}
             
             <View style={styles.priceContainer}>
               <Text style={styles.totalLabel}>Total à payer</Text>
@@ -195,47 +342,51 @@ const PaymentScreen = ({ route, navigation }) => {
           
           <View style={styles.paymentMethods}>
             {paymentMethods.map(method => (
-              <TouchableOpacity
-                key={method.id}
-                style={[
-                  styles.paymentMethod,
-                  selectedPaymentMethod === method.id && styles.selectedPaymentMethod
-                ]}
-                onPress={() => setSelectedPaymentMethod(method.id)}
-              >
-                <View style={styles.paymentMethodIcon}>
-                  <Ionicons 
-                    name={method.icon} 
-                    size={24} 
-                    color={selectedPaymentMethod === method.id ? COLORS.surface : method.color} 
-                  />
-                </View>
-                
-                <View style={styles.paymentMethodInfo}>
-                  <Text style={[
-                    styles.paymentMethodName,
-                    selectedPaymentMethod === method.id && styles.selectedText
-                  ]}>
-                    {method.name}
-                  </Text>
-                  <Text style={[
-                    styles.paymentMethodDescription,
-                    selectedPaymentMethod === method.id && styles.selectedText
-                  ]}>
-                    {method.description}
-                  </Text>
-                </View>
-                
-                <View style={styles.radioContainer}>
+                <TouchableOpacity
+                  key={method.id}
+                  style={[
+                    styles.paymentMethod,
+                    selectedPaymentMethod === method.id && styles.selectedPaymentMethod,
+                    selectedPaymentMethod === method.id && { borderColor: method.color, backgroundColor: method.backgroundColor }
+                  ]}
+                  onPress={() => setSelectedPaymentMethod(method.id)}
+                >
                   <View style={[
-                    styles.radio,
-                    selectedPaymentMethod === method.id && styles.radioSelected
+                    styles.paymentMethodIcon,
+                    { backgroundColor: method.backgroundColor || method.color + '20' }
                   ]}>
-                    {selectedPaymentMethod === method.id && (
-                      <View style={styles.radioInner} />
-                    )}
+                    <Ionicons 
+                      name={method.icon} 
+                      size={24} 
+                      color={selectedPaymentMethod === method.id ? method.color : method.color} 
+                    />
                   </View>
-                </View>
+                  
+                  <View style={styles.paymentMethodInfo}>
+                    <Text style={[
+                      styles.paymentMethodName,
+                      selectedPaymentMethod === method.id && { color: method.color, fontWeight: '600' }
+                    ]}>
+                      {method.name}
+                    </Text>
+                    <Text style={[
+                      styles.paymentMethodDescription,
+                      selectedPaymentMethod === method.id && { color: method.color, opacity: 0.8 }
+                    ]}>
+                      {method.description}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.radioContainer}>
+                    <View style={[
+                      styles.radio,
+                      selectedPaymentMethod === method.id && { borderColor: method.color, borderWidth: 3 }
+                    ]}>
+                      {selectedPaymentMethod === method.id && (
+                        <View style={[styles.radioInner, { backgroundColor: method.color }]} />
+                      )}
+                    </View>
+                  </View>
               </TouchableOpacity>
             ))}
           </View>
@@ -435,6 +586,77 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     padding: SPACING.md,
   },
+
+  simpleSummary: {
+    backgroundColor: COLORS.background,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
+  },
+
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+
+  summaryLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: COLORS.text.primary,
+    flex: 1,
+  },
+
+  summarySeats: {
+    fontSize: 14,
+    color: COLORS.text.secondary,
+    fontWeight: '500',
+  },
+
+  vipSeatsContainer: {
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+
+  vipSeatsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
+    marginBottom: SPACING.sm,
+  },
+
+  seatsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+  },
+
+  seatItem: {
+    backgroundColor: COLORS.primary + '10',
+    borderRadius: BORDER_RADIUS.sm,
+    padding: SPACING.sm,
+    minWidth: 100,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.primary + '30',
+  },
+
+  seatNumber: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
+    marginBottom: 2,
+  },
+
+  seatPassenger: {
+    fontSize: 12,
+    color: COLORS.text.secondary,
+    fontStyle: 'italic',
+  },
   
   bookingReference: {
     fontSize: 14,
@@ -501,17 +723,28 @@ const styles = StyleSheet.create({
   
   selectedPaymentMethod: {
     borderColor: COLORS.primary,
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.background,
+    borderWidth: 2,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
   },
   
   paymentMethodIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: COLORS.surface,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING.md,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   
   paymentMethodInfo: {
@@ -539,9 +772,9 @@ const styles = StyleSheet.create({
   },
   
   radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: COLORS.border,
     justifyContent: 'center',
@@ -550,14 +783,14 @@ const styles = StyleSheet.create({
   },
   
   radioSelected: {
-    borderColor: COLORS.surface,
+    borderColor: COLORS.primary,
   },
   
   radioInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.surface,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: COLORS.primary,
   },
   
   securityInfo: {

@@ -227,11 +227,14 @@ export const useSearchStore = create((set) => ({
   searchParams: {
     departure: '',
     arrival: '',
-    date: new Date(),
-    passengers: 1
+    date: new Date(), // Date actuelle du téléphone
+    returnDate: null,
+    passengers: 1,
+    isRoundTrip: false
   },
   
   searchResults: [],
+  returnSearchResults: [],
   isSearching: false,
 
   // Actions
@@ -241,15 +244,20 @@ export const useSearchStore = create((set) => ({
 
   setSearchResults: (results) => set({ searchResults: results }),
 
+  setReturnSearchResults: (results) => set({ returnSearchResults: results }),
+
   setIsSearching: (isSearching) => set({ isSearching }),
 
   clearSearch: () => set({ 
     searchResults: [],
+    returnSearchResults: [],
     searchParams: {
       departure: '',
       arrival: '',
       date: new Date(),
-      passengers: 1
+      returnDate: null,
+      passengers: 1,
+      isRoundTrip: false
     }
   })
 }))
@@ -260,6 +268,9 @@ export const useBookingStore = create((set) => ({
   selectedSeats: [],
   bookingData: null,
   paymentMethod: null,
+  returnTrip: null,
+  returnSelectedSeats: [],
+  bookingStep: 'outbound', // 'outbound', 'return', 'seats', 'recap', 'payment'
 
   // Actions
   setCurrentTrip: (trip) => set({ currentTrip: trip }),
@@ -270,17 +281,35 @@ export const useBookingStore = create((set) => ({
 
   setPaymentMethod: (method) => set({ paymentMethod: method }),
 
+  setReturnTrip: (trip) => set({ returnTrip: trip }),
+
+  setReturnSelectedSeats: (seats) => set({ returnSelectedSeats: seats }),
+
+  setBookingStep: (step) => set({ bookingStep: step }),
+
   clearBooking: () => set({
     currentTrip: null,
     selectedSeats: [],
     bookingData: null,
-    paymentMethod: null
+    paymentMethod: null,
+    returnTrip: null,
+    returnSelectedSeats: [],
+    bookingStep: 'outbound'
   }),
 
   getTotalPrice: () => {
-    const { currentTrip, selectedSeats } = useBookingStore.getState()
-    if (!currentTrip || !selectedSeats.length) return 0
-    return currentTrip.prix * selectedSeats.length
+    const { currentTrip, selectedSeats, returnTrip, returnSelectedSeats } = useBookingStore.getState()
+    let total = 0
+    
+    if (currentTrip && selectedSeats.length) {
+      total += currentTrip.prix * selectedSeats.length
+    }
+    
+    if (returnTrip && returnSelectedSeats.length) {
+      total += returnTrip.prix * returnSelectedSeats.length
+    }
+    
+    return total
   }
 }))
 
