@@ -7,7 +7,8 @@ import {
   TouchableOpacity,
   Modal,
   FlatList,
-  Alert
+  Alert,
+  ImageBackground
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -146,16 +147,27 @@ const HomeScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>TravelHub</Text>
-          <Text style={styles.subtitle}>Voyagez facilement au Cameroun</Text>
-        </View>
+        {/* Header and Search Form with Background Image */}
+        <ImageBackground
+          source={require('../../../assets/bus-background.jpg')}
+          style={styles.headerAndSearchBackground}
+          imageStyle={styles.backgroundImage}
+          resizeMode="cover"
+        >
+          <View style={styles.contentOverlay}>
+            {/* Header */}
+            <View style={styles.header}>
+              <View style={styles.titleContainer}>
+                <Ionicons name="bus" size={32} color={COLORS.text.white} style={styles.titleIcon} />
+                <Text style={styles.title}>TravelHub</Text>
+              </View>
+              <Text style={styles.subtitle}>Voyagez facilement au Cameroun</Text>
+            </View>
 
-        {/* Search Form */}
-        <View style={styles.searchCard}>
-          {/* Departure and Arrival */}
-          <View style={styles.routeContainer}>
+            {/* Search Form */}
+            <View style={styles.searchCard}>
+              {/* Departure and Arrival */}
+              <View style={styles.routeContainer}>
             <TouchableOpacity
               style={styles.citySelector}
               onPress={() => setShowDeparture(true)}
@@ -260,7 +272,9 @@ const HomeScreen = ({ navigation }) => {
             style={styles.searchButton}
             size="large"
           />
-        </View>
+            </View>
+          </View>
+        </ImageBackground>
 
         {/* Quick Access */}
         <View style={styles.quickAccessContainer}>
@@ -397,31 +411,68 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: COLORS.text.primary,
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: SPACING.xs,
   },
 
+  titleIcon: {
+    marginRight: SPACING.sm,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+
+  headerAndSearchBackground: {
+    // Pas de minHeight fixe, laisse le contenu déterminer la hauteur
+  },
+
+  backgroundImage: {
+    borderBottomLeftRadius: BORDER_RADIUS.lg,
+    borderBottomRightRadius: BORDER_RADIUS.lg,
+    opacity: 0.9,
+  },
+
+  contentOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.4)', // Overlay sombre pour une meilleure lisibilité
+    borderBottomLeftRadius: BORDER_RADIUS.lg,
+    borderBottomRightRadius: BORDER_RADIUS.lg,
+    paddingBottom: SPACING.lg,
+  },
+
+  title: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: COLORS.text.white,
+    marginBottom: SPACING.xs,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+
   subtitle: {
-    fontSize: 16,
-    color: COLORS.text.secondary,
+    fontSize: 18,
+    color: COLORS.text.white,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
 
   searchCard: {
-    backgroundColor: COLORS.background,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', // Blanc semi-transparent
     margin: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.lg,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+    backdropFilter: 'blur(10px)', // Effet de flou pour les plateformes qui le supportent
   },
 
   routeContainer: {
