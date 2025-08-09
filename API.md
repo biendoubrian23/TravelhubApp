@@ -22,6 +22,7 @@ const { data, error } = await authService.signUp(
 )
 ```
 
+
 ### Connexion
 ```javascript
 const { data, error } = await authService.signIn(
