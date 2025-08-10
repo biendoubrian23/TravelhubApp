@@ -1,14 +1,15 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Animated,
+  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import ConfettiCannon from 'react-native-confetti-cannon';
 import { Button } from '../../components';
 import { useBookingsStore, useAuthStore } from '../../store';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
@@ -18,37 +19,80 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
   const { addBooking } = useBookingsStore();
   const { user } = useAuthStore();
 
+  // Animations
+  const [checkAnimation] = useState(new Animated.Value(0));
+  const [fadeAnimation] = useState(new Animated.Value(0));
+  const [scaleAnimation] = useState(new Animated.Value(0));
+
   useEffect(() => {
-    // Ajouter la réservation à l'historique et à Supabase
-    const currentDate = new Date();
-    const formattedDate = currentDate.toISOString().split('T')[0];
-    const formattedTime = currentDate.toTimeString().substring(0, 5);
-    
-    // Créer un objet de réservation avec toutes les vérifications pour éviter les erreurs
-    const newBooking = {
-      departure: trip?.departure_city || trip?.ville_depart || 'Départ',
-      arrival: trip?.arrival_city || trip?.ville_arrivee || 'Arrivée',
-      date: formattedDate, // Utiliser la date actuelle pour éviter les problèmes
-      time: formattedTime, // Utiliser l'heure actuelle pour éviter les problèmes
-      price: totalPrice || 0,
-      status: 'upcoming',
-      busType: trip?.bus_type || 'VIP',
-      agency: trip?.agency?.name || 'TravelHub',
-      seatNumber: selectedSeats ? (Array.isArray(selectedSeats) ? selectedSeats.join(', ') : selectedSeats) : 'A1',
-      paymentMethod: paymentMethod || 'Paiement simulé',
-      duration: trip?.duration || '3h 30min',
-      trip: trip || {}, // Fournir un objet vide si trip est undefined
-      trip_id: trip?.id // Trip ID peut être undefined
+    // Animation d'entrée
+    Animated.sequence([
+      Animated.timing(scaleAnimation, {
+        toValue: 1,
+        duration: 600,
+        easing: Easing.elastic(1.2),
+        useNativeDriver: true,
+      }),
+      Animated.timing(checkAnimation, {
+        toValue: 1,
+        duration: 800,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnimation, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    const addBookingToHistory = async () => {
+      // Ajouter la réservation à l'historique et à Supabase
+      const currentDate = new Date();
+      const formattedDate = currentDate.toISOString().split('T')[0];
+      const formattedTime = currentDate.toTimeString().substring(0, 5);
+      
+      // Formatage correct des sièges
+      let formattedSeats = 'A1'; // Valeur par défaut
+      if (selectedSeats && Array.isArray(selectedSeats)) {
+        formattedSeats = selectedSeats.map(seat => {
+          if (typeof seat === 'object' && seat !== null) {
+            return seat.seat_number || seat.number || 'Siège';
+          }
+          return seat;
+        }).join(', ');
+      } else if (selectedSeats && typeof selectedSeats === 'string') {
+        formattedSeats = selectedSeats;
+      }
+
+      // Créer un objet de réservation avec toutes les vérifications pour éviter les erreurs
+      const newBooking = {
+        departure: trip?.departure_city || trip?.ville_depart || 'Départ',
+        arrival: trip?.arrival_city || trip?.ville_arrivee || 'Arrivée',
+        date: formattedDate, // Utiliser la date actuelle pour éviter les problèmes
+        time: formattedTime, // Utiliser l'heure actuelle pour éviter les problèmes
+        price: totalPrice || 0,
+        status: 'upcoming',
+        busType: trip?.bus_type || 'VIP',
+        agency: trip?.agency?.name || 'TravelHub',
+        seatNumber: formattedSeats,
+        paymentMethod: paymentMethod || 'Paiement simulé',
+        duration: trip?.duration || '3h 30min',
+        trip: trip || {}, // Fournir un objet vide si trip est undefined
+        trip_id: trip?.id // Trip ID peut être undefined
+      };
+
+      try {
+        // Passer l'utilisateur pour sauvegarder dans Supabase si connecté
+        const savedBooking = await addBooking(newBooking, user);
+        console.log('Réservation ajoutée avec succès:', savedBooking);
+        console.log('Nouvelle réservation:', JSON.stringify(newBooking, null, 2));
+      } catch (error) {
+        console.error('Erreur lors de l\'ajout de la réservation:', error);
+      }
     };
 
-    try {
-      // Passer l'utilisateur pour sauvegarder dans Supabase si connecté
-      const savedBooking = addBooking(newBooking, user);
-      console.log('Réservation ajoutée avec succès:', savedBooking);
-    } catch (error) {
-      console.error('Erreur lors de l\'ajout de la réservation:', error);
-    }
-    console.log('Réservation ajoutée à l\'historique:', savedBooking);
+    addBookingToHistory();
   }, []);
 
   const formatDateTime = (dateTime) => {
@@ -71,40 +115,63 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
   const handleBackToHome = () => {
     navigation.reset({
       index: 0,
-      routes: [{ name: 'Home' }],
+      routes: [{ name: 'ClientMain' }],
     });
   };
 
   const handleViewBookings = () => {
     navigation.reset({
       index: 0,
-      routes: [{ name: 'TripHistory' }],
+      routes: [{ 
+        name: 'ClientMain',
+        state: {
+          index: 1, // Index 1 correspond à l'onglet "Mes trajets" (Bookings)
+          routes: [
+            { name: 'Home' },
+            { name: 'Bookings' },
+            { name: 'Favorites' },
+            { name: 'Profile' }
+          ]
+        }
+      }],
     });
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Confettis */}
-      <ConfettiCannon
-        count={200}
-        origin={{x: -10, y: 0}}
-        autoStart={true}
-        fadeOut={true}
-        fallSpeed={3000}
-        colors={[COLORS.primary, COLORS.success, '#FFD700', '#FF6B6B', '#4ECDC4']}
-      />
-      
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Icône de succès */}
-        <View style={styles.successContainer}>
-          <View style={styles.successIcon}>
-            <Ionicons name="checkmark" size={48} color={COLORS.surface} />
-          </View>
-          <Text style={styles.successTitle}>Réservation confirmée !</Text>
-          <Text style={styles.successSubtitle}>
-            Votre billet a été réservé avec succès
-          </Text>
-        </View>
+        {/* Animation de succès */}
+        <Animated.View 
+          style={[
+            styles.successContainer,
+            {
+              transform: [{ scale: scaleAnimation }],
+            }
+          ]}
+        >
+          <Animated.View 
+            style={[
+              styles.successIcon,
+              {
+                transform: [{ 
+                  rotate: checkAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '360deg'],
+                  })
+                }],
+              }
+            ]}
+          >
+            <Ionicons name="checkmark-circle" size={80} color={COLORS.success} />
+          </Animated.View>
+          
+          <Animated.View style={{ opacity: fadeAnimation }}>
+            <Text style={styles.successTitle}>Paiement réussi !</Text>
+            <Text style={styles.successSubtitle}>
+              Votre réservation a été confirmée avec succès
+            </Text>
+          </Animated.View>
+        </Animated.View>
 
         {/* Informations de réservation */}
         <View style={styles.section}>
@@ -179,15 +246,30 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
           <Text style={styles.sectionTitle}>Sièges réservés</Text>
           
           <View style={styles.seatsContainer}>
-            {selectedSeats.map((seat, index) => (
-              <View key={seat.id} style={styles.seatCard}>
+            {selectedSeats && Array.isArray(selectedSeats) && selectedSeats.map((seat, index) => (
+              <View key={seat.id || index} style={styles.seatCard}>
                 <View style={styles.seatHeader}>
                   <Ionicons name="airplane" size={20} color={COLORS.primary} />
-                  <Text style={styles.seatNumber}>Siège {seat.seat_number}</Text>
+                  <Text style={styles.seatNumber}>
+                    Siège {seat.seat_number || seat.number || 'A1'}
+                  </Text>
                 </View>
-                <Text style={styles.seatType}>{seat.seat_type}</Text>
+                <Text style={styles.seatType}>{seat.seat_type || 'Standard'}</Text>
               </View>
             ))}
+            
+            {/* Affichage alternatif si selectedSeats n'est pas un tableau */}
+            {(!selectedSeats || !Array.isArray(selectedSeats)) && (
+              <View style={styles.seatCard}>
+                <View style={styles.seatHeader}>
+                  <Ionicons name="airplane" size={20} color={COLORS.primary} />
+                  <Text style={styles.seatNumber}>
+                    Siège {typeof selectedSeats === 'string' ? selectedSeats : 'A1'}
+                  </Text>
+                </View>
+                <Text style={styles.seatType}>Standard</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -272,13 +354,7 @@ const styles = StyleSheet.create({
   },
   
   successIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.success,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
   },
   
   successTitle: {

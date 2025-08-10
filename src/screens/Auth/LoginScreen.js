@@ -282,10 +282,10 @@ const LoginScreen = ({ navigation, route }) => {
 
             {/* Test Button - DEV ONLY */}
             <Button
-              title="🧪 Connexion Rapide (clarkybrian@outlook.fr)"
+              title="🧪 Connexion Rapide (clarjybrian@outlook.fr)"
               onPress={() => {
-                setEmail('clarkybrian@outlook.fr')
-                setPassword('123456')
+                setEmail('clarjybrian@outlook.fr')
+                setPassword('TravelHub2025!')
                 setTimeout(() => handleLogin(), 100)
               }}
               variant="outline"

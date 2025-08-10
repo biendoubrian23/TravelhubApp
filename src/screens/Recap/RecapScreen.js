@@ -89,6 +89,7 @@ const RecapScreen = ({ route, navigation }) => {
       trip,
       selectedSeats,
       totalPrice: calculateTotalPrice(),
+      isRoundTrip: false, // Ajouter explicitement isRoundTrip: false
       searchParams
     };
 

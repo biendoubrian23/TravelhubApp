@@ -13,6 +13,7 @@ import LoginScreen from '../screens/Auth/LoginScreen';
 import SignupScreen from '../screens/Auth/SignupScreen';
 import ProfileScreen from '../screens/Profile/ProfileScreen';
 import BookingsScreen from '../screens/Bookings/BookingsScreen';
+import BookingDetailsScreen from '../screens/Bookings/BookingDetailsScreen';
 import FavoritesScreen from '../screens/Favorites/FavoritesScreen';
 import SupabaseTestScreen from '../screens/SupabaseTestScreen';
 import RealtimeTestScreen from '../screens/RealtimeTestScreen';
@@ -205,6 +206,17 @@ const AppNavigator = () => {
                 presentation: 'card',
                 animationTypeForReplace: 'push',
                 gestureEnabled: false, // Empêcher le retour par geste
+              }}
+            />
+
+            {/* Booking Screens */}
+            <Stack.Screen 
+              name="BookingDetails" 
+              component={BookingDetailsScreen}
+              options={{
+                title: 'Détails de la réservation',
+                presentation: 'card',
+                animationTypeForReplace: 'push',
               }}
             />
 

@@ -22,7 +22,7 @@ const PaymentScreen = ({ route, navigation }) => {
     selectedSeats, 
     returnSelectedSeats, 
     totalPrice, 
-    isRoundTrip,
+    isRoundTrip = false, // Valeur par défaut
     searchParams 
   } = route.params;
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);

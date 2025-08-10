@@ -84,11 +84,16 @@ export const useBookingsStore = create((set, get) => ({
     }
     
     // Ajouter au store local
-    set(state => ({
-      bookings: [newBooking, ...state.bookings]
-    }))
+    set(state => {
+      const updatedBookings = [newBooking, ...state.bookings];
+      console.log('Store - Ajout réservation, total après ajout:', updatedBookings.length);
+      console.log('Store - Nouvelle réservation ajoutée:', newBooking);
+      return { bookings: updatedBookings };
+    })
     
-    // Sauvegarder dans Supabase si l'utilisateur est connecté
+    // Sauvegarde Supabase désactivée temporairement
+    // TODO: Réactiver quand la base de données sera prête
+    /*
     if (user?.id) {
       try {
         const bookingData = {
@@ -110,6 +115,7 @@ export const useBookingsStore = create((set, get) => ({
         console.error('Erreur lors de la sauvegarde:', error)
       }
     }
+    */
     
     return newBooking
   },
@@ -117,31 +123,16 @@ export const useBookingsStore = create((set, get) => ({
   loadBookings: async (user) => {
     set({ isLoading: true })
     try {
+      const currentBookings = get().bookings; // Préserver les réservations existantes
+      
       if (user?.id) {
         // Charger depuis Supabase pour les utilisateurs connectés
         const { data, error } = await bookingService.getUserBookings(user.id)
         
         if (error) {
           console.error('Erreur lors du chargement des réservations:', error)
-          // Fallback vers les données fictives
-          const mockBookings = [
-            {
-              id: 'BK001',
-              departure: 'Yaoundé',
-              arrival: 'Douala',
-              date: '2025-07-28',
-              time: '08:00',
-              price: 3500,
-              status: 'completed',
-              busType: 'VIP',
-              agency: 'Central Voyages',
-              seatNumber: 'A12',
-              paymentMethod: 'Orange Money',
-              bookingDate: '2025-07-25',
-              duration: '3h 30min'
-            }
-          ]
-          set({ bookings: mockBookings, isLoading: false })
+          // Garder les réservations locales existantes en cas d'erreur
+          set({ isLoading: false })
         } else {
           // Transformer les données Supabase au format attendu
           const transformedBookings = data.map(booking => ({
@@ -160,44 +151,18 @@ export const useBookingsStore = create((set, get) => ({
             duration: booking.trips.duration || '3h 30min'
           }))
           
-          set({ bookings: transformedBookings, isLoading: false })
+          // Combiner les réservations Supabase avec les réservations locales
+          // Éviter les doublons en filtrant par ID
+          const localBookingIds = currentBookings.map(b => b.id);
+          const newSupabaseBookings = transformedBookings.filter(b => !localBookingIds.includes(b.id));
+          const combinedBookings = [...currentBookings, ...newSupabaseBookings];
+          
+          set({ bookings: combinedBookings, isLoading: false })
         }
       } else {
-        // Pour l'instant, on utilise des données fictives pour les utilisateurs non connectés
-        const mockBookings = [
-          {
-            id: 'BK001',
-            departure: 'Yaoundé',
-            arrival: 'Douala',
-            date: '2025-07-28',
-            time: '08:00',
-            price: 3500,
-            status: 'completed',
-            busType: 'VIP',
-            agency: 'Central Voyages',
-            seatNumber: 'A12',
-            paymentMethod: 'Orange Money',
-            bookingDate: '2025-07-25',
-            duration: '3h 30min'
-          },
-          {
-            id: 'BK002',
-            departure: 'Douala',
-            arrival: 'Yaoundé',
-            date: '2025-08-05',
-            time: '14:30',
-            price: 3500,
-            status: 'upcoming',
-            busType: 'Classique',
-            agency: 'Garantie Express',
-            seatNumber: 'B05',
-            paymentMethod: 'MTN MoMo',
-            bookingDate: '2025-08-02',
-            duration: '3h 45min'
-          }
-        ]
-        
-        set({ bookings: mockBookings, isLoading: false })
+        // Pour les utilisateurs non connectés, garder uniquement les réservations locales
+        console.log('Utilisateur non connecté, garde les réservations locales:', currentBookings.length);
+        set({ isLoading: false })
       }
     } catch (error) {
       console.error('Error loading bookings:', error)

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, RefreshControl, Alert } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { 
   Text, 
   Card, 
@@ -13,65 +14,55 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING } from '../../constants';
 import { formatDate, formatPrice } from '../../utils/helpers';
+import { useBookingsStore, useAuthStore } from '../../store';
 
-const BookingsScreen = ({ navigation }) => {
-  const [bookings, setBookings] = useState([]);
-  const [loading, setLoading] = useState(false);
+const BookingsScreen = ({ navigation: routeNavigation }) => {
+  const { bookings, loadBookings, isLoading } = useBookingsStore();
+  const { user } = useAuthStore();
+  const navigation = useNavigation(); // Hook pour la navigation
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
 
   useEffect(() => {
-    loadBookings();
-  }, []);
-
-  const loadBookings = async () => {
-    setLoading(true);
-    try {
-      // TODO: Charger les réservations depuis Supabase
-      // Données de test pour l'instant
-      const mockBookings = [
-        {
-          id: '1',
-          booking_reference: 'TH001234',
-          trip: {
-            departure_city: 'Douala',
-            arrival_city: 'Yaoundé',
-            departure_time: '2025-08-05T06:00:00Z',
-            arrival_time: '2025-08-05T09:30:00Z',
-            agency: { name: 'Voyage Express' },
-            bus_type: 'VIP'
-          },
-          seat_number: '12A',
-          total_price_fcfa: 4500,
-          booking_status: 'confirmed',
-          payment_status: 'completed',
-          created_at: '2025-08-03T10:00:00Z'
-        },
-        {
-          id: '2',
-          booking_reference: 'TH001235',
-          trip: {
-            departure_city: 'Yaoundé',
-            arrival_city: 'Douala',
-            departure_time: '2025-08-07T14:00:00Z',
-            arrival_time: '2025-08-07T17:30:00Z',
-            agency: { name: 'Garantie Express' },
-            bus_type: 'Classique'
-          },
-          seat_number: '15B',
-          total_price_fcfa: 3500,
-          booking_status: 'pending',
-          payment_status: 'pending',
-          created_at: '2025-08-03T15:30:00Z'
-        }
-      ];
-      setBookings(mockBookings);
-    } catch (error) {
-      console.error('Erreur chargement réservations:', error);
-    } finally {
-      setLoading(false);
+    // Charger les réservations seulement au premier rendu
+    if (bookings.length === 0) {
+      loadBookings(user);
     }
+  }, [user]);
+
+  // Rafraîchir les données seulement si on tire pour rafraîchir
+  // useFocusEffect supprimé pour éviter les rechargements intempestifs
+  
+  const handleRefresh = () => {
+    loadBookings(user);
   };
+
+  // Adapter les données du store vers le format attendu par l'interface
+  const adaptBookingData = (booking) => {
+    return {
+      id: booking.id,
+      booking_reference: booking.id,
+      trip: {
+        departure_city: booking.departure,
+        arrival_city: booking.arrival,
+        departure_time: `${booking.date}T${booking.time}:00Z`,
+        arrival_time: `${booking.date}T${booking.time}:00Z`,
+        agency: { name: booking.agency },
+        bus_type: booking.busType
+      },
+      seat_number: booking.seatNumber,
+      total_price_fcfa: booking.price,
+      booking_status: booking.status === 'upcoming' ? 'confirmed' : booking.status,
+      payment_status: 'completed',
+      created_at: booking.bookingDate || new Date().toISOString()
+    };
+  };
+
+  // Adapter toutes les réservations
+  const adaptedBookings = bookings.map(adaptBookingData);
+  
+  console.log('BookingsScreen - Nombre de réservations:', bookings.length);
+  console.log('BookingsScreen - Réservations:', bookings);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -93,7 +84,7 @@ const BookingsScreen = ({ navigation }) => {
     }
   };
 
-  const filteredBookings = bookings.filter(booking => {
+  const filteredBookings = adaptedBookings.filter(booking => {
     const matchesSearch = booking.trip.departure_city.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          booking.trip.arrival_city.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          booking.booking_reference.toLowerCase().includes(searchQuery.toLowerCase());
@@ -205,7 +196,7 @@ const BookingsScreen = ({ navigation }) => {
           {booking.booking_status === 'confirmed' && (
             <Button 
               mode="contained" 
-              onPress={() => {/* TODO: Télécharger le billet */}}
+              onPress={() => Alert.alert('E-Billet', 'Fonctionnalité de téléchargement bientôt disponible')}
               style={{ flex: 1, marginLeft: SPACING.xs }}
             >
               E-Billet
@@ -264,7 +255,7 @@ const BookingsScreen = ({ navigation }) => {
         <ScrollView 
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={loading} onRefresh={loadBookings} />
+            <RefreshControl refreshing={isLoading} onRefresh={handleRefresh} />
           }
         >
           {filteredBookings.length > 0 ? (
@@ -295,7 +286,11 @@ const BookingsScreen = ({ navigation }) => {
                 </Text>
                 <Button 
                   mode="contained" 
-                  onPress={() => navigation.navigate('Home')}
+                  onPress={() => {
+                    // Navigation simple vers l'onglet Home
+                    navigation.navigate('Home');
+                  }}
+                  style={{ backgroundColor: COLORS.primary }}
                 >
                   Réserver un voyage
                 </Button>

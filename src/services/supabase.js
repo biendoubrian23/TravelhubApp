@@ -160,17 +160,33 @@ export const tripService = {
 export const bookingService = {
   // Créer une réservation
   async createBooking(bookingData, userId) {
+    // Convertir les sièges sélectionnés en format string pour seat_number
+    let seatNumber = 'A1'; // Valeur par défaut
+    if (bookingData.selectedSeats) {
+      if (Array.isArray(bookingData.selectedSeats)) {
+        seatNumber = bookingData.selectedSeats.length > 0 
+          ? bookingData.selectedSeats.map(seat => 
+              typeof seat === 'object' ? seat.seat_number || seat.number : seat
+            ).join(', ')
+          : 'A1';
+      } else if (typeof bookingData.selectedSeats === 'string') {
+        seatNumber = bookingData.selectedSeats;
+      }
+    }
+
     const { data, error } = await supabase
       .from('bookings')
       .insert({
         user_id: userId,
         trip_id: bookingData.trip_id || bookingData.trip?.id,
-        seat_numbers: bookingData.selectedSeats,
-        total_price: bookingData.totalPrice,
-        payment_method: bookingData.paymentMethod,
+        passenger_name: bookingData.passenger_name || 'Passager',
+        passenger_phone: bookingData.passenger_phone || '+237600000000',
+        seat_number: seatNumber,
+        total_price_fcfa: bookingData.totalPrice || 0,
+        payment_method: bookingData.paymentMethod || 'Non spécifié',
         payment_status: 'completed',
         booking_status: 'confirmed',
-        booking_reference: bookingData.booking_reference,
+        booking_reference: bookingData.booking_reference || `TH${Date.now()}`,
         created_at: new Date().toISOString()
       })
       .select(`

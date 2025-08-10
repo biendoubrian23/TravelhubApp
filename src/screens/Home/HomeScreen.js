@@ -431,11 +431,11 @@ const styles = StyleSheet.create({
   backgroundImage: {
     borderBottomLeftRadius: BORDER_RADIUS.lg,
     borderBottomRightRadius: BORDER_RADIUS.lg,
-    opacity: 0.9,
+    opacity: 1.0, // Augmenté de 0.9 à 1.0 pour plus de visibilité
   },
 
   contentOverlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.4)', // Overlay sombre pour une meilleure lisibilité
+    backgroundColor: 'rgba(0, 0, 0, 0.25)', // Réduit de 0.4 à 0.25 pour moins d'assombrissement
     borderBottomLeftRadius: BORDER_RADIUS.lg,
     borderBottomRightRadius: BORDER_RADIUS.lg,
     paddingBottom: SPACING.lg,
@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
   },
 
   searchCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)', // Blanc semi-transparent
+    backgroundColor: 'rgba(255, 255, 255, 0.85)', // Réduit de 0.95 à 0.85 pour plus de transparence
     margin: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.lg,
@@ -484,8 +484,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 2, // Bordure épaissie
+    borderColor: COLORS.primary + '80', // Bordure plus visible
     borderRadius: BORDER_RADIUS.sm,
     marginBottom: SPACING.sm,
   },
@@ -547,8 +547,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 2, // Bordure épaissie
+    borderColor: COLORS.primary + '80', // Bordure plus visible
     borderRadius: BORDER_RADIUS.sm,
   },
 
@@ -557,8 +557,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 2, // Bordure épaissie
+    borderColor: COLORS.primary + '80', // Bordure plus visible
     borderRadius: BORDER_RADIUS.sm,
     marginBottom: SPACING.lg,
   },

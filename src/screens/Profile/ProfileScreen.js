@@ -205,14 +205,31 @@ const ProfileScreen = ({ navigation }) => {
             icon="heart"
             title="Trajets favoris"
             subtitle="Vos destinations préférées"
-            onPress={() => navigation.navigate('Favorites')}
+            onPress={() => {
+              // Navigation vers l'onglet Favorites dans ClientMain
+              navigation.reset({
+                index: 0,
+                routes: [{ 
+                  name: 'ClientMain',
+                  state: {
+                    index: 2, // Index 2 correspond à l'onglet "Favorites"
+                    routes: [
+                      { name: 'Home' },
+                      { name: 'Bookings' },
+                      { name: 'Favorites' },
+                      { name: 'Profile' }
+                    ]
+                  }
+                }],
+              });
+            }}
           />
           
           <MenuItem
             icon="receipt"
             title="Factures et reçus"
             subtitle="Téléchargez vos justificatifs"
-            onPress={() => navigation.navigate('Invoices')}
+            onPress={() => Alert.alert('Bientôt disponible', 'Cette fonctionnalité sera disponible prochainement')}
           />
         </MenuSection>
 
@@ -222,21 +239,21 @@ const ProfileScreen = ({ navigation }) => {
             icon="language"
             title="Langue"
             subtitle="Français"
-            onPress={() => navigation.navigate('LanguageSettings')}
+            onPress={() => Alert.alert('Bientôt disponible', 'Cette fonctionnalité sera disponible prochainement')}
           />
           
           <MenuItem
             icon="moon"
             title="Thème"
             subtitle="Clair, Sombre, Automatique"
-            onPress={() => navigation.navigate('ThemeSettings')}
+            onPress={() => Alert.alert('Bientôt disponible', 'Cette fonctionnalité sera disponible prochainement')}
           />
           
           <MenuItem
             icon="download"
             title="Données hors ligne"
             subtitle="Gérer le cache et téléchargements"
-            onPress={() => navigation.navigate('OfflineData')}
+            onPress={() => Alert.alert('Bientôt disponible', 'Cette fonctionnalité sera disponible prochainement')}
           />
         </MenuSection>
 
