@@ -125,6 +125,12 @@ export const useBookingsStore = create((set, get) => ({
     try {
       const currentBookings = get().bookings; // Préserver les réservations existantes
       
+      // Mode local seulement pour éviter les erreurs Supabase
+      console.log('Mode local - Conservation des réservations existantes')
+      set({ isLoading: false })
+      
+      // Supabase désactivé temporairement
+      /*
       if (user?.id) {
         // Charger depuis Supabase pour les utilisateurs connectés
         const { data, error } = await bookingService.getUserBookings(user.id)
@@ -164,6 +170,7 @@ export const useBookingsStore = create((set, get) => ({
         console.log('Utilisateur non connecté, garde les réservations locales:', currentBookings.length);
         set({ isLoading: false })
       }
+      */
     } catch (error) {
       console.error('Error loading bookings:', error)
       set({ isLoading: false })
