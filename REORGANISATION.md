@@ -2,6 +2,7 @@
 
 ## ✅ Organisation Réalisée
 
+
 ### 🗄️ Scripts SQL → `src/database/`
 Les fichiers suivants ont été déplacés :
 - `supabase-schema.sql`
