@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { authService, bookingService } from '../services/supabase'
+import { authService } from '../services'
+import { bookingService } from '../services/bookingService'
 
 // Store d'authentification
 export const useAuthStore = create((set, get) => ({
@@ -91,31 +92,59 @@ export const useBookingsStore = create((set, get) => ({
       return { bookings: updatedBookings };
     })
     
-    // Sauvegarde Supabase désactivée temporairement
-    // TODO: Réactiver quand la base de données sera prête
-    /*
+    // Sauvegarde Supabase ACTIVE
     if (user?.id) {
       try {
+        // Mapping et validation des données pour Supabase
+        const tripId = booking.trip?.id || booking.trip_id;
+        if (!tripId) {
+          console.error('❌ Aucun trip_id trouvé dans:', booking);
+          throw new Error('trip_id manquant pour la sauvegarde Supabase');
+        }
+
         const bookingData = {
-          trip_id: booking.trip?.id,
-          selectedSeats: booking.seatNumber ? [booking.seatNumber] : [],
-          totalPrice: booking.price,
-          paymentMethod: booking.paymentMethod,
-          booking_reference: newBooking.id
+          tripId: tripId,
+          userId: user.id,
+          seatNumber: booking.seatNumber,
+          passengerName: user.user_metadata?.full_name || user.full_name || user.name || 'Client TravelHub',
+          passengerPhone: user.user_metadata?.phone || user.phone || '+237600000000',
+          totalPrice: booking.price || 0,
+          paymentMethod: booking.paymentMethod || 'mobile_money',
+          selectedSeats: booking.selectedSeats // Pour les sièges VIP
         }
         
-        const { data, error } = await bookingService.createBooking(bookingData, user.id)
+        console.log('💾 Sauvegarde réservation en BD avec données mappées:', bookingData)
+        const data = await bookingService.createBooking(bookingData)
         
-        if (error) {
-          console.error('Erreur lors de la sauvegarde dans Supabase:', error)
-        } else {
-          console.log('Réservation sauvegardée dans Supabase:', data)
+        if (data) {
+          console.log('✅ Réservation sauvegardée dans Supabase:', data)
+          
+          // Mettre à jour la réservation locale avec l'ID de la BD
+          set((state) => {
+            const updatedBookings = state.bookings.map(b => 
+              b.id === booking.id 
+                ? { ...b, supabaseId: data.id, syncedWithDB: true }
+                : b
+            );
+            return { bookings: updatedBookings };
+          })
         }
       } catch (error) {
-        console.error('Erreur lors de la sauvegarde:', error)
+        console.error('❌ Erreur lors de la sauvegarde:', error)
+        
+        // Marquer la réservation comme non synchronisée
+        set((state) => {
+          const updatedBookings = state.bookings.map(b => 
+            b.id === booking.id 
+              ? { ...b, syncedWithDB: false, syncError: error.message }
+              : b
+          );
+          return { bookings: updatedBookings };
+        })
       }
+    } else {
+      console.log('⚠️ Utilisateur non connecté - sauvegarde locale seulement')
     }
-    */
     
     return newBooking
   },

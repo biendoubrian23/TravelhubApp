@@ -13,8 +13,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { TripCard } from '../../components'
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants'
 import { useSearchStore, useBookingStore } from '../../store'
-import { tripService } from '../../services/supabase'
-import { mockTripService } from '../../services/mockTripService'
+import { tripService } from '../../services/tripService'
 import { formatDate, formatPrice, formatTime } from '../../utils/helpers'
 
 const ResultsScreen = ({ navigation, route }) => {
@@ -122,23 +121,34 @@ const ResultsScreen = ({ navigation, route }) => {
   const searchTrips = async () => {
     setIsSearching(true)
     try {
-      // Utiliser le service de mock pour générer des trajets pour les 5 prochains jours
-      const trips = mockTripService.generateTripsForDays(searchParams, 5)
+      // Rechercher les trajets dans la base de données uniquement
+      const trips = await tripService.searchTrips({
+        departure: searchParams.departure,
+        arrival: searchParams.arrival,
+        date: searchParams.date
+      })
+      
       setSearchResults(trips)
       
-      // Si c'est un aller-retour, générer aussi les trajets de retour
+      // Si c'est un aller-retour, rechercher aussi les trajets de retour
       if (searchParams.isRoundTrip && searchParams.returnDate) {
-        const returnSearchParams = {
+        const returnTrips = await tripService.searchTrips({
           departure: searchParams.arrival,
-          arrival: searchParams.departure
-        }
-        const returnTrips = mockTripService.generateTripsForDays(returnSearchParams, 5)
+          arrival: searchParams.departure,
+          date: searchParams.returnDate
+        })
         setReturnSearchResults(returnTrips)
       }
       
     } catch (error) {
-      console.error('Erreur lors de la recherche:', error)
-      Alert.alert('Erreur', 'Impossible de charger les trajets')
+      console.error('Erreur lors de la recherche des trajets:', error)
+      Alert.alert(
+        'Erreur de connexion', 
+        'Impossible de récupérer les trajets depuis la base de données. Veuillez vérifier votre connexion internet et réessayer.'
+      )
+      // Ne pas utiliser de fallback, laisser les résultats vides
+      setSearchResults([])
+      setReturnSearchResults([])
     } finally {
       setIsSearching(false)
     }
@@ -342,20 +352,19 @@ const ResultsScreen = ({ navigation, route }) => {
       // Rechercher les nouveaux trajets selon le mode
       if (showingReturnTrips) {
         // Mode retour : rechercher les trajets retour pour la nouvelle date
-        const returnSearchParams = {
+        const returnTrips = await tripService.searchTrips({
           departure: searchParams.arrival,
           arrival: searchParams.departure,
-          date: selectedDate
-        }
-        const returnTrips = mockTripService.generateTripsForDays(returnSearchParams, 1)
+          date: selectedDate.toISOString().split('T')[0]
+        })
         setReturnSearchResults(returnTrips)
       } else {
         // Mode aller : rechercher les trajets aller pour la nouvelle date  
-        const tripSearchParams = {
-          ...localSearchParams,
-          date: selectedDate
-        }
-        const trips = mockTripService.generateTripsForDays(tripSearchParams, 1)
+        const trips = await tripService.searchTrips({
+          departure: localSearchParams.departure,
+          arrival: localSearchParams.arrival,
+          date: selectedDate.toISOString().split('T')[0]
+        })
         setSearchResults(trips)
       }
       

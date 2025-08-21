@@ -16,7 +16,9 @@ import BookingsScreen from '../screens/Bookings/BookingsScreen';
 import BookingDetailsScreen from '../screens/Bookings/BookingDetailsScreen';
 import FavoritesScreen from '../screens/Favorites/FavoritesScreen';
 import SupabaseTestScreen from '../screens/SupabaseTestScreen';
-import RealtimeTestScreen from '../screens/RealtimeTestScreen';
+import RealtimeTestScreen from '../screens/RealtimeTestScreenDiagnostic';
+import RealDataTestScreen from '../screens/RealDataTestScreen';
+import VipSeatDisplayScreen from '../screens/VipSeatDisplayScreen';
 import SeatSelectionScreen from '../screens/SeatSelection/SeatSelectionScreen';
 import RecapScreen from '../screens/Recap/RecapScreen';
 import PaymentScreen from '../screens/Payment/PaymentScreen';
@@ -263,6 +265,26 @@ const AppNavigator = () => {
               component={RealtimeTestScreen}
               options={{
                 title: '🧪 Test Realtime',
+                presentation: 'card',
+                animationTypeForReplace: 'push',
+              }}
+            />
+
+            <Stack.Screen 
+              name="RealDataTest" 
+              component={RealDataTestScreen}
+              options={{
+                title: '🗄️ Test Données Réelles',
+                presentation: 'card',
+                animationTypeForReplace: 'push',
+              }}
+            />
+
+            <Stack.Screen 
+              name="VipSeatDisplay" 
+              component={VipSeatDisplayScreen}
+              options={{
+                title: '🚌 Plan Sièges VIP',
                 presentation: 'card',
                 animationTypeForReplace: 'push',
               }}

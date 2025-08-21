@@ -25,9 +25,9 @@ const SignupScreen = ({ navigation }) => {
     prenom: '',
     email: '',
     telephone: '',
+    ville: '',
     password: '',
-    confirmPassword: '',
-    role: 'client'
+    confirmPassword: ''
   })
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -57,6 +57,8 @@ const SignupScreen = ({ navigation }) => {
       newErrors.telephone = 'Numéro de téléphone invalide'
     }
 
+    // Ville est optionnelle, pas de validation requise
+
     if (!formData.password.trim()) {
       newErrors.password = 'Le mot de passe est requis'
     } else if (formData.password.length < 6) {
@@ -85,7 +87,7 @@ const SignupScreen = ({ navigation }) => {
           nom: formData.nom.trim(),
           prenom: formData.prenom.trim(),
           telephone: formData.telephone.trim(),
-          role: formData.role,
+          ville: formData.ville.trim() || null,
           full_name: `${formData.prenom.trim()} ${formData.nom.trim()}`
         }
       )
@@ -101,7 +103,14 @@ const SignupScreen = ({ navigation }) => {
             [
               { 
                 text: 'Se connecter', 
-                onPress: () => navigation.navigate('Login', { email: formData.email.trim().toLowerCase() }),
+                onPress: () => {
+                  try {
+                    navigation.navigate('Login', { email: formData.email.trim().toLowerCase() })
+                  } catch (navError) {
+                    console.warn('Navigation error:', navError)
+                    navigation.navigate('Login')
+                  }
+                },
                 style: 'default'
               },
               { 
@@ -149,7 +158,23 @@ const SignupScreen = ({ navigation }) => {
           'Inscription réussie', 
           'Votre compte a été créé avec succès. Un email de confirmation vous a été envoyé. Veuillez vérifier votre boîte de réception et confirmer votre compte pour vous connecter.',
           [
-            { text: 'OK', onPress: () => navigation.navigate('Login', { email: formData.email.trim().toLowerCase() }) }
+            { 
+              text: 'OK', 
+              onPress: () => {
+                // Si l'utilisateur est déjà connecté après signup, pas besoin de naviguer
+                if (data.user && data.session) {
+                  console.log('Utilisateur connecté automatiquement après inscription')
+                  // Ne pas naviguer, l'AppNavigator gérera automatiquement
+                } else {
+                  try {
+                    navigation.navigate('Login', { email: formData.email.trim().toLowerCase() })
+                  } catch (navError) {
+                    console.warn('Navigation error:', navError)
+                    navigation.navigate('Login')
+                  }
+                }
+              }
+            }
           ]
         )
       }
@@ -185,7 +210,11 @@ const SignupScreen = ({ navigation }) => {
           'Email envoyé',
           'Un email de réinitialisation de mot de passe a été envoyé à votre adresse. Veuillez vérifier votre boîte de réception.'
         )
-        navigation.navigate('Login')
+        try {
+          navigation.navigate('Login')
+        } catch (navError) {
+          console.warn('Navigation error:', navError)
+        }
       }
     } catch (error) {
       console.error('Password reset error:', error)
@@ -223,54 +252,8 @@ const SignupScreen = ({ navigation }) => {
               <View style={styles.headerContent}>
                 <Text style={styles.title}>Inscription</Text>
                 <Text style={styles.subtitle}>
-                  Créez votre compte TravelHub
+                  Créez votre compte voyageur TravelHub
                 </Text>
-              </View>
-            </View>
-
-            {/* Role Selection */}
-            <View style={styles.roleContainer}>
-              <Text style={styles.roleLabel}>Type de compte</Text>
-              <View style={styles.roleOptions}>
-                <TouchableOpacity
-                  style={[
-                    styles.roleOption,
-                    formData.role === 'client' && styles.roleOptionSelected
-                  ]}
-                  onPress={() => updateFormData('role', 'client')}
-                >
-                  <Ionicons
-                    name="person"
-                    size={20}
-                    color={formData.role === 'client' ? COLORS.text.white : COLORS.primary}
-                  />
-                  <Text style={[
-                    styles.roleOptionText,
-                    formData.role === 'client' && styles.roleOptionTextSelected
-                  ]}>
-                    Voyageur
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.roleOption,
-                    formData.role === 'agence' && styles.roleOptionSelected
-                  ]}
-                  onPress={() => updateFormData('role', 'agence')}
-                >
-                  <Ionicons
-                    name="business"
-                    size={20}
-                    color={formData.role === 'agence' ? COLORS.text.white : COLORS.primary}
-                  />
-                  <Text style={[
-                    styles.roleOptionText,
-                    formData.role === 'agence' && styles.roleOptionTextSelected
-                  ]}>
-                    Agence
-                  </Text>
-                </TouchableOpacity>
               </View>
             </View>
 
@@ -313,6 +296,15 @@ const SignupScreen = ({ navigation }) => {
                 placeholder="+237 XXX XXX XXX"
                 keyboardType="phone-pad"
                 error={errors.telephone}
+              />
+
+              <Input
+                label="Ville (optionnel)"
+                value={formData.ville}
+                onChangeText={(value) => updateFormData('ville', value)}
+                placeholder="Ex: Douala, Yaoundé..."
+                autoCapitalize="words"
+                error={errors.ville}
               />
 
               <View style={styles.passwordContainer}>

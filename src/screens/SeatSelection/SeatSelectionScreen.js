@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRealtimeSeatMaps } from '../../hooks/useRealtime';
+import { busService } from '../../services';
 import { Button } from '../../components';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
 
@@ -66,68 +67,149 @@ const SeatSelectionScreen = ({ route, navigation }) => {
   console.log('SeatSelection - Show return selection:', showReturnSelection);
   console.log('SeatSelection - Preselected outbound seats:', preselectedOutboundSeats);
   
-  // Hook pour les sièges en temps réel (avec fallback pour les données mockées)
+  // Hook pour les sièges en temps réel (avec fallback pour les données réelles)
   const { seatMaps, loading, error } = useRealtimeSeatMaps(currentTrip?.id);
+  
+  // État pour les sièges réels depuis la base de données
+  const [realSeatMaps, setRealSeatMaps] = useState([]);
+  const [isLoadingSeats, setIsLoadingSeats] = useState(false);
+  
+  // Fonction pour récupérer les sièges réels
+  const loadRealSeats = async () => {
+    if (!currentTrip?.id || !currentTrip?.bus_info?.id) {
+      console.log('Pas d\'ID de trajet ou de bus disponible');
+      return;
+    }
+
+    setIsLoadingSeats(true);
+    try {
+      // Utiliser la nouvelle fonction pour récupérer la disposition VIP
+      const seatLayout = await busService.getVipSeatDisplayLayout(currentTrip.id);
+      
+      if (seatLayout.stats.totalSeats === 0) {
+        console.log('Aucun siège trouvé dans seat_maps, utilisation de la méthode de fallback');
+        // Fallback vers l'ancienne méthode
+        const seatsWithAvailability = await busService.getAvailableSeatsForTrip(
+          currentTrip.id,
+          currentTrip.bus_info.id
+        );
+        setRealSeatMaps(seatsWithAvailability);
+      } else {
+        // Convertir le layout VIP en format compatible avec l'interface existante
+        const formattedSeats = []
+        seatLayout.layout.forEach(row => {
+          row.seats.forEach(seat => {
+            formattedSeats.push({
+              id: `${currentTrip.id}-${seat.seatNumber}`, // Clé unique
+              seat_number: seat.seatNumber,
+              seat_type: seat.type,
+              is_available: seat.isAvailable,
+              position_row: row.rowNumber,
+              position_column: seat.column,
+              price_modifier_fcfa: seat.priceModifier || 0
+            })
+          })
+        })
+        setRealSeatMaps(formattedSeats);
+        console.log(`Sièges VIP chargés: ${seatLayout.stats.totalSeats} places (${seatLayout.stats.availableSeats} libres, ${seatLayout.stats.occupiedSeats} occupées)`);
+      }
+    } catch (error) {
+      console.error('Erreur lors du chargement des sièges:', error);
+      // En cas d'erreur, générer des sièges mockés
+      generateMockSeatMaps();
+    } finally {
+      setIsLoadingSeats(false);
+    }
+  };
+
+  useEffect(() => {
+    // Charger les vraies données de sièges
+    loadRealSeats();
+  }, [currentTrip?.id, currentTrip?.bus_info?.id]);
   
   // Fallback pour les données mockées si pas de sièges trouvés
   const [mockSeatMaps, setMockSeatMaps] = useState([]);
   
   useEffect(() => {
-    // Si pas de sièges réels, générer des sièges mockés
-    if (!loading && (!seatMaps || seatMaps.length === 0)) {
+    // Si pas de sièges réels après le chargement, générer des sièges mockés
+    if (!isLoadingSeats && realSeatMaps.length === 0 && (!seatMaps || seatMaps.length === 0)) {
       console.log('Génération de sièges mockés pour le trip:', currentTrip?.id);
       generateMockSeatMaps();
     }
-  }, [loading, seatMaps, currentTrip]);
+  }, [isLoadingSeats, realSeatMaps, seatMaps, currentTrip]);
 
   const generateMockSeatMaps = () => {
     const seats = [];
-    const busType = currentTrip?.bus_type || 'classique';
-    let totalSeats = 45; // Classique par défaut
+    // Utiliser les données réelles du bus si disponibles
+    const totalSeats = currentTrip?.bus_info?.total_seats || currentTrip?.total_seats || 40;
+    const isVipBus = currentTrip?.bus_info?.is_vip || currentTrip?.is_vip || false;
     
-    // Vérification de sécurité pour busType
-    const safeBusType = busType && typeof busType === 'string' ? busType.toLowerCase() : 'classique';
+    // Configuration basée sur le type de bus réel
+    const seatsPerRow = isVipBus ? 3 : 4; // VIP: 1+2, Standard: 2+2
+    const rows = Math.ceil(totalSeats / seatsPerRow);
     
-    if (safeBusType.includes('premium')) totalSeats = 40;
-    if (safeBusType.includes('vip')) totalSeats = 35;
+    let seatNumber = 1;
     
-    // Générer les sièges
-    for (let row = 1; row <= Math.ceil(totalSeats / 4); row++) {
-      for (let col = 0; col < 4; col++) {
-        const seatNumber = ['A', 'B', 'C', 'D'][col] + row;
-        const seatIndex = (row - 1) * 4 + col;
+    for (let row = 1; row <= rows && seatNumber <= totalSeats; row++) {
+      if (isVipBus) {
+        // Configuration VIP: 1 siège à gauche, 2 sièges à droite
+        const positions = ['A', 'C', 'D']; // A = gauche, C et D = droite
         
-        if (seatIndex < totalSeats) {
-          let seatType = 'standard';
-          let priceModifier = 0;
-          
-          if (safeBusType.includes('premium')) {
-            seatType = 'premium';
-            priceModifier = 500;
-          } else if (safeBusType.includes('vip')) {
-            seatType = 'vip';
-            priceModifier = 1000;
+        positions.forEach((letter, index) => {
+          if (seatNumber <= totalSeats) {
+            seats.push({
+              id: `mock_${currentTrip?.id || 'unknown'}_${seatNumber}`,
+              trip_id: currentTrip?.id || 'unknown',
+              seat_number: seatNumber,
+              row_number: row,
+              seat_letter: letter,
+              seat_type: index === 0 ? 'window' : (index === 1 ? 'aisle' : 'window'),
+              is_vip: true,
+              position: index === 0 ? 'left' : 'right',
+              is_available: Math.random() > 0.3, // 70% de sièges disponibles
+              is_occupied: Math.random() <= 0.3,
+              price_modifier_fcfa: 1000
+            });
+            seatNumber++;
           }
-          
-          seats.push({
-            id: `mock_${trip?.id || 'unknown'}_${seatNumber}`,
-            trip_id: trip?.id || 'unknown',
-            seat_number: seatNumber,
-            seat_type: seatType,
-            is_available: Math.random() > 0.3, // 70% de sièges disponibles
-            price_modifier_fcfa: priceModifier,
-            position_row: row,
-            position_column: col + 1
-          });
-        }
+        });
+      } else {
+        // Configuration standard: 2 sièges à gauche, 2 sièges à droite
+        const positions = [
+          { letter: 'A', type: 'window', side: 'left' },
+          { letter: 'B', type: 'aisle', side: 'left' },
+          { letter: 'C', type: 'aisle', side: 'right' },
+          { letter: 'D', type: 'window', side: 'right' }
+        ];
+        
+        positions.forEach(pos => {
+          if (seatNumber <= totalSeats) {
+            seats.push({
+              id: `mock_${currentTrip?.id || 'unknown'}_${seatNumber}`,
+              trip_id: currentTrip?.id || 'unknown',
+              seat_number: seatNumber,
+              row_number: row,
+              seat_letter: pos.letter,
+              seat_type: pos.type,
+              is_vip: false,
+              position: pos.side,
+              is_available: Math.random() > 0.3, // 70% de sièges disponibles
+              is_occupied: Math.random() <= 0.3,
+              price_modifier_fcfa: 0
+            });
+            seatNumber++;
+          }
+        });
       }
     }
     
     setMockSeatMaps(seats);
   };
 
-  // Utiliser les sièges réels ou mockés
-  const availableSeats = seatMaps && seatMaps.length > 0 ? seatMaps : mockSeatMaps;
+  // Utiliser les sièges réels en priorité, puis les sièges du hook temps réel, puis les mockés
+  const availableSeats = realSeatMaps.length > 0 
+    ? realSeatMaps 
+    : (seatMaps && seatMaps.length > 0 ? seatMaps : mockSeatMaps);
 
   useEffect(() => {
     // Calculer le prix total
@@ -163,6 +245,12 @@ const SeatSelectionScreen = ({ route, navigation }) => {
   }, [selectedSeats, returnSelectedSeats, currentTrip, isRoundTrip, outboundTrip, returnTrip, currentStep]);
 
   const handleSeatPress = (seat) => {
+    console.log('🎯 Siège cliqué:', { 
+      id: seat.id, 
+      seat_number: seat.seat_number, 
+      is_available: seat.is_available 
+    });
+
     if (!seat.is_available) {
       Alert.alert('Siège indisponible', 'Ce siège est déjà réservé');
       return;
@@ -171,10 +259,15 @@ const SeatSelectionScreen = ({ route, navigation }) => {
     const currentSeats = currentStep === 'outbound' ? selectedSeats : returnSelectedSeats;
     const setCurrentSeats = currentStep === 'outbound' ? setSelectedSeats : setReturnSelectedSeats;
 
+    console.log('🔍 Sièges actuellement sélectionnés:', currentSeats.map(s => ({ id: s.id, number: s.seat_number })));
+
     setCurrentSeats(prev => {
       const isSelected = prev.find(s => s.id === seat.id);
+      console.log('📍 Siège déjà sélectionné?', isSelected ? 'OUI' : 'NON');
+      
       if (isSelected) {
         // Désélectionner
+        console.log('❌ Désélection du siège', seat.seat_number);
         return prev.filter(s => s.id !== seat.id);
       } else {
         // Sélectionner (limité par le nombre de passagers)
@@ -185,6 +278,7 @@ const SeatSelectionScreen = ({ route, navigation }) => {
           );
           return prev;
         }
+        console.log('✅ Sélection du siège', seat.seat_number);
         return [...prev, seat];
       }
     });
@@ -462,8 +556,14 @@ const SeatSelectionScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Vérification si le trajet actuel nécessite une sélection de sièges */}
-      {!currentTripIsVip ? (
+      {/* Afficher un indicateur de chargement pendant le chargement des sièges */}
+      {(isLoadingSeats || loading) ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Chargement des sièges disponibles...</Text>
+        </View>
+      ) : /* Vérification si le trajet actuel nécessite une sélection de sièges */
+      !currentTripIsVip ? (
         <View style={styles.noSeatSelectionContainer}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -899,6 +999,20 @@ const styles = StyleSheet.create({
   
   buttonDisabled: {
     opacity: 0.5,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+
+  loadingText: {
+    fontSize: 16,
+    color: COLORS.text.secondary,
+    marginTop: SPACING.md,
+    textAlign: 'center',
   },
 });
 

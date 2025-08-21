@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Calendar } from 'react-native-calendars'
-import { Button, Input } from '../../components'
+import { Button, Input, DataSourceIndicator } from '../../components'
 import { COLORS, SPACING, BORDER_RADIUS, CITIES } from '../../constants'
 import { useSearchStore } from '../../store'
 import { formatDate } from '../../utils/helpers'
@@ -163,6 +163,12 @@ const HomeScreen = ({ navigation }) => {
               </View>
               <Text style={styles.subtitle}>Voyagez facilement au Cameroun</Text>
             </View>
+
+            {/* Data Source Indicator */}
+            <DataSourceIndicator 
+              visible={__DEV__} 
+              onPress={() => navigation.navigate('RealDataTest')}
+            />
 
             {/* Search Form */}
             <View style={styles.searchCard}>
