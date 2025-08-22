@@ -18,32 +18,61 @@ const BookingDetailsScreen = ({ route, navigation }) => {
   const { bookingId } = route.params;
   const { bookings, cancelBooking } = useBookingsStore();
   
-  // Trouver la réservation
+  // Trouver la réservation avec protection
   const booking = bookings.find(b => b.id === bookingId);
   
+  // Protection complète - ne pas continuer si booking est undefined
   if (!booking) {
     return (
       <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.text.primary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Détails de la réservation</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={48} color={COLORS.error} />
           <Text style={styles.errorTitle}>Réservation introuvable</Text>
           <Text style={styles.errorSubtitle}>
-            Cette réservation n'existe pas ou a été supprimée
+            Cette réservation n'existe pas ou a été supprimée.
           </Text>
           <Button
             title="Retour"
             onPress={() => navigation.goBack()}
-            style={styles.backButton}
+            style={{ marginTop: SPACING.lg }}
           />
         </View>
       </SafeAreaView>
     );
   }
 
+  // S'assurer que toutes les propriétés existent avec des valeurs par défaut
+  const safeBooking = {
+    departure: booking.departure || 'Ville inconnue',
+    arrival: booking.arrival || 'Ville inconnue',
+    date: booking.date || 'Date inconnue',
+    time: booking.time || '00:00',
+    id: booking.id || 'N/A',
+    seatNumber: booking.seatNumber || 'N/A',
+    busType: booking.busType || 'Standard',
+    agency: booking.agency || 'TravelHub',
+    price: booking.price || 0,
+    status: booking.status || 'unknown',
+    passengerName: booking.passengerName || 'Nom non défini',
+    passengerPhone: booking.passengerPhone || 'Non défini',
+    paymentMethod: booking.paymentMethod || 'Non spécifié',
+    bookingDate: booking.bookingDate || new Date().toISOString(),
+    duration: booking.duration || 'Durée estimée',
+    ...booking
+  };
+
   const getStatusInfo = (status) => {
     switch (status) {
-      case 'upcoming':
       case 'confirmed':
+      case 'upcoming':
         return {
           color: COLORS.success,
           icon: 'checkmark-circle',
@@ -53,7 +82,7 @@ const BookingDetailsScreen = ({ route, navigation }) => {
       case 'completed':
         return {
           color: COLORS.primary,
-          icon: 'flag',
+          icon: 'checkmark-done',
           text: 'Terminé',
           bgColor: COLORS.primary + '15'
         };
@@ -81,7 +110,7 @@ const BookingDetailsScreen = ({ route, navigation }) => {
     }
   };
 
-  const statusInfo = getStatusInfo(booking.status);
+  const statusInfo = getStatusInfo(safeBooking.status);
 
   const handleCancelBooking = () => {
     Alert.alert(
@@ -93,12 +122,8 @@ const BookingDetailsScreen = ({ route, navigation }) => {
           text: 'Oui, annuler',
           style: 'destructive',
           onPress: () => {
-            cancelBooking(booking.id);
-            Alert.alert(
-              'Réservation annulée',
-              'Votre réservation a été annulée avec succès.',
-              [{ text: 'OK', onPress: () => navigation.goBack() }]
-            );
+            cancelBooking(safeBooking.id);
+            navigation.goBack();
           }
         }
       ]
@@ -110,12 +135,12 @@ const BookingDetailsScreen = ({ route, navigation }) => {
       await Share.share({
         message: `🎫 Réservation TravelHub
         
-📍 ${booking.departure} → ${booking.arrival}
-📅 ${booking.date} à ${booking.time}
-🎟️ Référence: ${booking.id}
-💺 Siège: ${booking.seatNumber}
-🚌 ${booking.busType} - ${booking.agency}
-💰 ${booking.price?.toLocaleString()} FCFA
+📍 ${safeBooking.departure} → ${safeBooking.arrival}
+📅 ${safeBooking.date} à ${safeBooking.time}
+🎟️ Référence: ${safeBooking.id}
+💺 Siège: ${safeBooking.seatNumber}
+🚌 ${safeBooking.busType} - ${safeBooking.agency}
+💰 ${safeBooking.price?.toLocaleString()} FCFA
 
 Bon voyage ! 🚌✨`,
         title: 'Ma réservation TravelHub'
@@ -135,7 +160,7 @@ Bon voyage ! 🚌✨`,
     });
   };
 
-  const canCancel = booking.status === 'upcoming' || booking.status === 'confirmed';
+  const canCancel = safeBooking.status === 'upcoming' || safeBooking.status === 'confirmed';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -157,12 +182,14 @@ Bon voyage ! 🚌✨`,
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Statut */}
+        {/* Statut de la réservation */}
         <View style={[styles.statusCard, { backgroundColor: statusInfo.bgColor }]}>
-          <Ionicons name={statusInfo.icon} size={32} color={statusInfo.color} />
-          <Text style={[styles.statusText, { color: statusInfo.color }]}>
-            {statusInfo.text}
-          </Text>
+          <View style={styles.statusContent}>
+            <Ionicons name={statusInfo.icon} size={24} color={statusInfo.color} />
+            <Text style={[styles.statusText, { color: statusInfo.color }]}>
+              {statusInfo.text}
+            </Text>
+          </View>
         </View>
 
         {/* Informations du voyage */}
@@ -170,14 +197,14 @@ Bon voyage ! 🚌✨`,
           <View style={styles.tripHeader}>
             <Text style={styles.sectionTitle}>Informations du voyage</Text>
             <View style={styles.tripBadge}>
-              <Text style={styles.tripBadgeText}>{booking.busType}</Text>
+              <Text style={styles.tripBadgeText}>{safeBooking.busType}</Text>
             </View>
           </View>
 
           <View style={styles.routeContainer}>
             <View style={styles.cityContainer}>
-              <Text style={styles.cityName}>{booking.departure}</Text>
-              <Text style={styles.cityTime}>{booking.time}</Text>
+              <Text style={styles.cityName}>{safeBooking.departure}</Text>
+              <Text style={styles.cityTime}>{safeBooking.time}</Text>
             </View>
             
             <View style={styles.routeMiddle}>
@@ -187,16 +214,16 @@ Bon voyage ! 🚌✨`,
             </View>
             
             <View style={styles.cityContainer}>
-              <Text style={styles.cityName}>{booking.arrival}</Text>
+              <Text style={styles.cityName}>{safeBooking.arrival}</Text>
               <Text style={styles.cityTime}>
-                {booking.duration || 'Durée estimée'}
+                {safeBooking.duration}
               </Text>
             </View>
           </View>
 
           <View style={styles.dateContainer}>
             <Ionicons name="calendar" size={16} color={COLORS.text.secondary} />
-            <Text style={styles.dateText}>{formatDate(booking.date)}</Text>
+            <Text style={styles.dateText}>{formatDate(safeBooking.date)}</Text>
           </View>
         </View>
 
@@ -208,27 +235,27 @@ Bon voyage ! 🚌✨`,
             <DetailItem
               icon="receipt"
               label="Référence"
-              value={booking.id}
+              value={safeBooking.id}
             />
             <DetailItem
               icon="person"
               label="Siège"
-              value={booking.seatNumber}
+              value={safeBooking.seatNumber}
             />
             <DetailItem
               icon="business"
               label="Agence"
-              value={booking.agency}
+              value={safeBooking.agency}
             />
             <DetailItem
               icon="card"
               label="Moyen de paiement"
-              value={booking.paymentMethod}
+              value={safeBooking.paymentMethod}
             />
             <DetailItem
               icon="calendar"
               label="Date de réservation"
-              value={new Date(booking.bookingDate).toLocaleDateString('fr-FR')}
+              value={new Date(safeBooking.bookingDate).toLocaleDateString('fr-FR')}
             />
           </View>
         </View>
@@ -239,7 +266,7 @@ Bon voyage ! 🚌✨`,
           <View style={styles.priceContainer}>
             <Text style={styles.priceLabel}>Montant payé</Text>
             <Text style={styles.priceValue}>
-              {booking.price?.toLocaleString()} FCFA
+              {safeBooking.price?.toLocaleString()} FCFA
             </Text>
           </View>
           <View style={styles.paymentStatusContainer}>
@@ -248,54 +275,23 @@ Bon voyage ! 🚌✨`,
           </View>
         </View>
 
-        {/* Instructions importantes */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Informations importantes</Text>
-          
-          <View style={styles.instructionsList}>
-            <InstructionItem
-              icon="time"
-              text="Présentez-vous 30 minutes avant le départ"
-              color={COLORS.warning}
-            />
-            <InstructionItem
-              icon="card"
-              text="Munissez-vous d'une pièce d'identité valide"
-              color={COLORS.info}
-            />
-            <InstructionItem
-              icon="phone-portrait"
-              text="Gardez cette confirmation sur votre téléphone"
-              color={COLORS.primary}
+        {/* Actions */}
+        {canCancel && (
+          <View style={styles.actionsContainer}>
+            <Button
+              title="Annuler la réservation"
+              onPress={handleCancelBooking}
+              style={[styles.actionButton, styles.cancelButton]}
+              textStyle={styles.cancelButtonText}
             />
           </View>
-        </View>
-
-        {/* Espace pour les boutons */}
-        <View style={{ height: 100 }} />
-      </ScrollView>
-
-      {/* Actions en bas */}
-      <View style={styles.footer}>
-        {canCancel && (
-          <Button
-            title="Annuler la réservation"
-            onPress={handleCancelBooking}
-            variant="outline"
-            style={[styles.actionButton, styles.cancelButton]}
-          />
         )}
-        <Button
-          title="Contacter l'agence"
-          onPress={() => Alert.alert('Contact', 'Fonctionnalité bientôt disponible')}
-          style={styles.actionButton}
-        />
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
 
-// Composants auxiliaires
+// Composant auxiliaire
 const DetailItem = ({ icon, label, value }) => (
   <View style={styles.detailItem}>
     <View style={styles.detailLeft}>
@@ -306,285 +302,217 @@ const DetailItem = ({ icon, label, value }) => (
   </View>
 );
 
-const InstructionItem = ({ icon, text, color }) => (
-  <View style={styles.instructionItem}>
-    <Ionicons name={icon} size={16} color={color} />
-    <Text style={styles.instructionText}>{text}</Text>
-  </View>
-);
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
     backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: COLORS.text.primary,
     flex: 1,
     textAlign: 'center',
   },
-  
-  shareButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.primary + '15',
-    justifyContent: 'center',
-    alignItems: 'center',
+  backButton: {
+    padding: SPACING.xs,
   },
-  
+  shareButton: {
+    padding: SPACING.xs,
+  },
   content: {
     flex: 1,
     padding: SPACING.md,
   },
-  
   statusCard: {
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.md,
+  },
+  statusContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.lg,
-    marginBottom: SPACING.md,
   },
-  
   statusText: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: 'bold',
     marginLeft: SPACING.sm,
   },
-  
   tripCard: {
     backgroundColor: COLORS.surface,
+    padding: SPACING.md,
     borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.lg,
     marginBottom: SPACING.md,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  
   tripHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
   },
-  
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.text.primary,
+  },
   tripBadge: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.primary + '15',
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
     borderRadius: BORDER_RADIUS.sm,
   },
-  
   tripBadgeText: {
-    color: COLORS.surface,
+    color: COLORS.primary,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
   },
-  
   routeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: SPACING.md,
   },
-  
   cityContainer: {
     flex: 1,
-    alignItems: 'center',
   },
-  
   cityName: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: COLORS.text.primary,
-    marginBottom: SPACING.xs,
   },
-  
   cityTime: {
     fontSize: 14,
     color: COLORS.text.secondary,
+    marginTop: 2,
   },
-  
   routeMiddle: {
-    flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
   },
-  
   routeLine: {
-    height: 2,
+    width: 40,
+    height: 1,
     backgroundColor: COLORS.primary,
-    flex: 1,
   },
-  
   dateContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: SPACING.md,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
   },
-  
   dateText: {
     fontSize: 14,
     color: COLORS.text.secondary,
     marginLeft: SPACING.xs,
-    textTransform: 'capitalize',
   },
-  
   card: {
     backgroundColor: COLORS.surface,
+    padding: SPACING.md,
     borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.lg,
     marginBottom: SPACING.md,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.text.primary,
-    marginBottom: SPACING.md,
-  },
-  
   detailsList: {
-    gap: SPACING.md,
+    marginTop: SPACING.sm,
   },
-  
   detailItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
-  
   detailLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
   },
-  
   detailLabel: {
     fontSize: 14,
     color: COLORS.text.secondary,
     marginLeft: SPACING.sm,
   },
-  
   detailValue: {
     fontSize: 14,
     fontWeight: '500',
     color: COLORS.text.primary,
   },
-  
   priceContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
+    marginTop: SPACING.sm,
+    paddingVertical: SPACING.sm,
   },
-  
   priceLabel: {
     fontSize: 16,
     color: COLORS.text.secondary,
   },
-  
   priceValue: {
     fontSize: 20,
     fontWeight: 'bold',
     color: COLORS.primary,
   },
-  
   paymentStatusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: SPACING.sm,
-    backgroundColor: COLORS.success + '15',
-    borderRadius: BORDER_RADIUS.sm,
+    marginTop: SPACING.xs,
   },
-  
   paymentStatusText: {
     fontSize: 14,
     color: COLORS.success,
-    fontWeight: '500',
     marginLeft: SPACING.xs,
   },
-  
-  instructionsList: {
-    gap: SPACING.md,
+  actionsContainer: {
+    marginTop: SPACING.lg,
+    marginBottom: SPACING.xl,
   },
-  
-  instructionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  
-  instructionText: {
-    fontSize: 14,
-    color: COLORS.text.secondary,
-    marginLeft: SPACING.sm,
-    flex: 1,
-  },
-  
-  footer: {
-    padding: SPACING.md,
-    backgroundColor: COLORS.surface,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    gap: SPACING.sm,
-  },
-  
   actionButton: {
-    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.md,
   },
-  
   cancelButton: {
+    backgroundColor: COLORS.error + '15',
     borderColor: COLORS.error,
+    borderWidth: 1,
   },
-  
+  cancelButtonText: {
+    color: COLORS.error,
+  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: SPACING.xl,
   },
-  
   errorTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: COLORS.text.primary,
     marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
-  },
-  
-  errorSubtitle: {
-    fontSize: 14,
-    color: COLORS.text.secondary,
     textAlign: 'center',
-    marginBottom: SPACING.xl,
   },
-  
-  backButton: {
-    marginTop: SPACING.md,
+  errorSubtitle: {
+    fontSize: 16,
+    color: COLORS.text.secondary,
+    marginTop: SPACING.sm,
+    textAlign: 'center',
   },
 });
 

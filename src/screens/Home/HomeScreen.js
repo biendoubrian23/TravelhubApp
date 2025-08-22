@@ -170,6 +170,16 @@ const HomeScreen = ({ navigation }) => {
               onPress={() => navigation.navigate('RealDataTest')}
             />
 
+            {/* Database Test Button - Development only */}
+            {__DEV__ && (
+              <TouchableOpacity
+                style={styles.devTestButton}
+                onPress={() => navigation.navigate('DatabaseTest')}
+              >
+                <Text style={styles.devTestButtonText}>🗄️ Test DB</Text>
+              </TouchableOpacity>
+            )}
+
             {/* Search Form */}
             <View style={styles.searchCard}>
               {/* Departure and Arrival */}
@@ -723,6 +733,22 @@ const styles = StyleSheet.create({
 
   testButtonText: {
     fontSize: 20,
+  },
+
+  devTestButton: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    backgroundColor: COLORS.warning + '90',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+
+  devTestButtonText: {
+    color: COLORS.text.white,
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 })
 

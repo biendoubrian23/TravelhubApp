@@ -24,45 +24,62 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
   const [filter, setFilter] = useState('all');
 
   useEffect(() => {
-    // Charger les réservations seulement au premier rendu
-    if (bookings.length === 0) {
-      loadBookings(user);
-    }
+    // Charger les réservations quand l'utilisateur change ou au premier rendu
+    console.log('🔄 BookingsScreen - useEffect triggered, user:', user?.email);
+    loadBookings(user);
   }, [user]);
 
+  // Force refresh when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('📱 BookingsScreen - Screen focused, reloading bookings');
+      loadBookings(user);
+    }, [user])
+  );
+
   // Rafraîchir les données seulement si on tire pour rafraîchir
-  // useFocusEffect supprimé pour éviter les rechargements intempestifs
   
   const handleRefresh = () => {
+    console.log('🔄 BookingsScreen - Manual refresh triggered');
     loadBookings(user);
   };
 
   // Adapter les données du store vers le format attendu par l'interface
   const adaptBookingData = (booking) => {
+    // Protection contre les objets undefined ou null
+    if (!booking) {
+      console.warn('BookingsScreen - Réservation undefined reçue');
+      return null;
+    }
+
     return {
-      id: booking.id,
-      booking_reference: booking.id,
+      id: booking.id || 'unknown',
+      booking_reference: booking.id || booking.bookingReference || 'unknown',
       trip: {
-        departure_city: booking.departure,
-        arrival_city: booking.arrival,
-        departure_time: `${booking.date}T${booking.time}:00Z`,
-        arrival_time: `${booking.date}T${booking.time}:00Z`,
-        agency: { name: booking.agency },
-        bus_type: booking.busType
+        departure_city: booking.departure || 'Ville inconnue',
+        arrival_city: booking.arrival || 'Ville inconnue',
+        departure_time: booking.date && booking.time ? `${booking.date}T${booking.time}:00Z` : new Date().toISOString(),
+        arrival_time: booking.date && booking.time ? `${booking.date}T${booking.time}:00Z` : new Date().toISOString(),
+        agency: { name: booking.agency || 'TravelHub' },
+        bus_type: booking.busType || 'standard'
       },
-      seat_number: booking.seatNumber,
-      total_price_fcfa: booking.price,
-      booking_status: booking.status === 'upcoming' ? 'confirmed' : booking.status,
-      payment_status: 'completed',
+      seat_number: booking.seatNumber || 'N/A',
+      total_price_fcfa: booking.price || 0,
+      booking_status: booking.status === 'upcoming' ? 'confirmed' : (booking.status || 'pending'),
+      payment_status: booking.paymentStatus || 'completed',
       created_at: booking.bookingDate || new Date().toISOString()
     };
   };
 
-  // Adapter toutes les réservations
-  const adaptedBookings = bookings.map(adaptBookingData);
+  // Adapter toutes les réservations avec filtrage des valeurs null
+  const adaptedBookings = bookings
+    .map(adaptBookingData)
+    .filter(booking => booking !== null);
   
   console.log('BookingsScreen - Nombre de réservations:', bookings.length);
-  console.log('BookingsScreen - Réservations:', bookings);
+  console.log('BookingsScreen - Réservations brutes:', bookings);
+  console.log('BookingsScreen - Réservations adaptées:', adaptedBookings);
+  console.log('BookingsScreen - Réservations filtrées:', filteredBookings);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -85,9 +102,19 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
   };
 
   const filteredBookings = adaptedBookings.filter(booking => {
-    const matchesSearch = booking.trip.departure_city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         booking.trip.arrival_city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         booking.booking_reference.toLowerCase().includes(searchQuery.toLowerCase());
+    // Protection supplémentaire contre les objets mal formés
+    if (!booking || !booking.trip) {
+      console.warn('BookingsScreen - Réservation ou trip manquant:', booking);
+      return false;
+    }
+
+    const departure = booking.trip.departure_city || '';
+    const arrival = booking.trip.arrival_city || '';
+    const reference = booking.booking_reference || '';
+    
+    const matchesSearch = departure.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         arrival.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         reference.toLowerCase().includes(searchQuery.toLowerCase());
     
     if (filter === 'all') return matchesSearch;
     return matchesSearch && booking.booking_status === filter;

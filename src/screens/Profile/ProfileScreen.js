@@ -250,6 +250,13 @@ const ProfileScreen = ({ navigation }) => {
           />
           
           <MenuItem
+            icon="flask"
+            title="🧪 Test Réservations"
+            subtitle="Diagnostique du système de réservations"
+            onPress={() => navigation.navigate('ReservationTest')}
+          />
+          
+          <MenuItem
             icon="download"
             title="Données hors ligne"
             subtitle="Gérer le cache et téléchargements"

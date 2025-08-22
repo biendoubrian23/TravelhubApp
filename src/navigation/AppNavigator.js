@@ -23,6 +23,8 @@ import SeatSelectionScreen from '../screens/SeatSelection/SeatSelectionScreen';
 import RecapScreen from '../screens/Recap/RecapScreen';
 import PaymentScreen from '../screens/Payment/PaymentScreen';
 import PaymentSuccessScreen from '../screens/Payment/PaymentSuccessScreen';
+import ReservationTestScreen from '../screens/ReservationTestScreen';
+import DatabaseTestScreen from '../screens/DatabaseTestScreen';
 
 // New Auth Screens
 import SplashScreen from '../screens/Auth/SplashScreen';
@@ -281,10 +283,30 @@ const AppNavigator = () => {
             />
 
             <Stack.Screen 
+              name="DatabaseTest" 
+              component={DatabaseTestScreen}
+              options={{
+                title: '🗄️ Test Base de Données',
+                presentation: 'card',
+                animationTypeForReplace: 'push',
+              }}
+            />
+
+            <Stack.Screen 
               name="VipSeatDisplay" 
               component={VipSeatDisplayScreen}
               options={{
                 title: '🚌 Plan Sièges VIP',
+                presentation: 'card',
+                animationTypeForReplace: 'push',
+              }}
+            />
+
+            <Stack.Screen 
+              name="ReservationTest" 
+              component={ReservationTestScreen}
+              options={{
+                title: '🧪 Test Réservations',
                 presentation: 'card',
                 animationTypeForReplace: 'push',
               }}

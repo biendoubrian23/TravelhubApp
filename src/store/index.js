@@ -106,8 +106,7 @@ export const useBookingsStore = create((set, get) => ({
           tripId: tripId,
           userId: user.id,
           seatNumber: booking.seatNumber,
-          passengerName: user.user_metadata?.full_name || user.full_name || user.name || 'Client TravelHub',
-          passengerPhone: user.user_metadata?.phone || user.phone || '+237600000000',
+          // Ne plus passer les infos génériques - le service les récupérera depuis la table users
           totalPrice: booking.price || 0,
           paymentMethod: booking.paymentMethod || 'mobile_money',
           selectedSeats: booking.selectedSeats // Pour les sièges VIP
@@ -154,190 +153,215 @@ export const useBookingsStore = create((set, get) => ({
     try {
       const currentBookings = get().bookings; // Préserver les réservations existantes
       
-      // Mode local seulement pour éviter les erreurs Supabase
-      console.log('Mode local - Conservation des réservations existantes')
-      set({ isLoading: false })
-      
-      // Supabase désactivé temporairement
-      /*
       if (user?.id) {
-        // Charger depuis Supabase pour les utilisateurs connectés
-        const { data, error } = await bookingService.getUserBookings(user.id)
+        console.log('🔄 Chargement des réservations depuis Supabase pour:', user.email);
         
-        if (error) {
-          console.error('Erreur lors du chargement des réservations:', error)
+        try {
+          // Charger depuis Supabase pour les utilisateurs connectés
+          const data = await bookingService.getUserBookings(user.id)
+          console.log('✅ Réservations récupérées depuis Supabase:', data);
+          
+          if (data && data.length > 0) {
+            // Transformer les données Supabase au format attendu avec protection
+            const transformedBookings = data.map(booking => {
+              // Protection contre les relations manquantes
+              const trip = booking.trips || {};
+              const agency = trip.agencies || {};
+              
+              console.log('🔄 Transformation booking:', {
+                bookingId: booking.id,
+                trip: trip,
+                ville_depart: trip.ville_depart,
+                ville_arrivee: trip.ville_arrivee,
+                date: trip.date,
+                heure_dep: trip.heure_dep,
+                agency: agency
+              });
+              
+              return {
+                id: booking.id,
+                departure: trip.ville_depart || 'Ville inconnue',
+                arrival: trip.ville_arrivee || 'Ville inconnue', 
+                date: trip.date || new Date().toISOString().split('T')[0],
+                time: trip.heure_dep || '00:00',
+                price: booking.total_price_fcfa || 0,
+                status: booking.booking_status === 'confirmed' ? 'upcoming' : (booking.booking_status || 'pending'),
+                busType: trip.bus_type || 'standard',
+                agency: agency.nom || 'TravelHub',
+                seatNumber: booking.seat_number || 'N/A',
+                bookingDate: booking.created_at,
+                bookingReference: booking.booking_reference || booking.id,
+                passengerName: booking.passenger_name || 'Nom non défini',
+                passengerPhone: booking.passenger_phone || 'Non défini',
+                paymentMethod: booking.payment_method || 'Non spécifié',
+                paymentStatus: booking.payment_status || 'pending',
+                // Informations du trajet pour affichage détaillé
+                trip: trip,
+                trip_id: booking.trip_id,
+                supabaseId: booking.id, // ID de la BD
+                syncedWithDB: true
+              };
+            }).filter(booking => booking.id); // Filtrer les réservations sans ID
+            
+            // Combiner avec les réservations locales (si elles ne sont pas déjà synchronisées)
+            const localOnlyBookings = currentBookings.filter(local => 
+              !transformedBookings.find(db => db.supabaseId === local.supabaseId)
+            );
+            
+            const allBookings = [...transformedBookings, ...localOnlyBookings];
+            
+            console.log(`📋 Total réservations: ${allBookings.length} (${transformedBookings.length} BD + ${localOnlyBookings.length} locales)`);
+            
+            set({ 
+              bookings: allBookings,
+              isLoading: false 
+            });
+          } else {
+            console.log('📋 Aucune réservation trouvée en BD, création de données de test...');
+            
+            // Créer quelques réservations de test avec de vraies villes
+            const testBookings = [
+              {
+                id: 'test-1',
+                departure: 'Douala',
+                arrival: 'Yaoundé',
+                date: '2025-08-25',
+                time: '08:00',
+                price: 5500,
+                status: 'confirmed',
+                busType: 'VIP',
+                agency: 'Central Voyages',
+                seatNumber: '12A',
+                bookingDate: new Date().toISOString(),
+                bookingReference: 'TV001',
+                passengerName: user.user_metadata?.full_name || 'Test User',
+                passengerPhone: user.user_metadata?.phone || '+237600000000',
+                paymentMethod: 'Orange Money',
+                paymentStatus: 'confirmed',
+                syncedWithDB: false
+              },
+              {
+                id: 'test-2', 
+                departure: 'Bafoussam',
+                arrival: 'Douala',
+                date: '2025-08-26',
+                time: '14:30',
+                price: 3000,
+                status: 'upcoming',
+                busType: 'Standard',
+                agency: 'TravelHub',
+                seatNumber: '8B',
+                bookingDate: new Date().toISOString(),
+                bookingReference: 'TV002',
+                passengerName: user.user_metadata?.full_name || 'Test User',
+                passengerPhone: user.user_metadata?.phone || '+237600000000',
+                paymentMethod: 'Stripe',
+                paymentStatus: 'confirmed',
+                syncedWithDB: false
+              }
+            ];
+            
+            const allBookings = [...testBookings, ...currentBookings];
+            
+            set({ 
+              bookings: allBookings,
+              isLoading: false 
+            });
+          }
+        } catch (supabaseError) {
+          console.error('❌ Erreur lors du chargement des réservations:', supabaseError)
           // Garder les réservations locales existantes en cas d'erreur
           set({ isLoading: false })
-        } else {
-          // Transformer les données Supabase au format attendu
-          const transformedBookings = data.map(booking => ({
-            id: booking.id,
-            departure: booking.trips.departure_city,
-            arrival: booking.trips.arrival_city,
-            date: booking.trips.departure_time.split('T')[0],
-            time: booking.trips.departure_time.split('T')[1].substring(0, 5),
-            price: booking.total_price,
-            status: booking.booking_status === 'confirmed' ? 'upcoming' : booking.booking_status,
-            busType: booking.trips.bus_type || 'VIP',
-            agency: booking.trips.agencies?.name || 'TravelHub',
-            seatNumber: booking.seat_numbers.join(', '),
-            paymentMethod: booking.payment_method,
-            bookingDate: booking.created_at.split('T')[0],
-            duration: booking.trips.duration || '3h 30min'
-          }))
-          
-          // Combiner les réservations Supabase avec les réservations locales
-          // Éviter les doublons en filtrant par ID
-          const localBookingIds = currentBookings.map(b => b.id);
-          const newSupabaseBookings = transformedBookings.filter(b => !localBookingIds.includes(b.id));
-          const combinedBookings = [...currentBookings, ...newSupabaseBookings];
-          
-          set({ bookings: combinedBookings, isLoading: false })
         }
       } else {
-        // Pour les utilisateurs non connectés, garder uniquement les réservations locales
-        console.log('Utilisateur non connecté, garde les réservations locales:', currentBookings.length);
-        set({ isLoading: false })
+        console.log('👤 Utilisateur non connecté - mode local uniquement');
+        set({ isLoading: false });
       }
-      */
     } catch (error) {
-      console.error('Error loading bookings:', error)
-      set({ isLoading: false })
+      console.error('❌ Erreur générale loadBookings:', error);
+      set({ isLoading: false });
     }
   },
 
   getBookingsByStatus: (status) => {
     const { bookings } = get()
-    if (status === 'all') return bookings
     return bookings.filter(booking => booking.status === status)
   },
 
-  cancelBooking: (bookingId) => {
-    set(state => ({
-      bookings: state.bookings.map(booking =>
-        booking.id === bookingId
-          ? { ...booking, status: 'cancelled', cancelReason: 'Annulé par le client' }
-          : booking
-      )
-    }))
-  }
+  removeBooking: (bookingId) => set(state => ({
+    bookings: state.bookings.filter(booking => booking.id !== bookingId)
+  })),
+
+  updateBookingStatus: (bookingId, status) => set(state => ({
+    bookings: state.bookings.map(booking =>
+      booking.id === bookingId ? { ...booking, status } : booking
+    )
+  }))
 }))
 
-// Store de recherche de trajets
+// Store de recherche
 export const useSearchStore = create((set) => ({
   searchParams: {
     departure: '',
     arrival: '',
-    date: new Date(), // Date actuelle du téléphone
+    date: new Date(),
     returnDate: null,
     passengers: 1,
+    busType: 'all',
     isRoundTrip: false
   },
-  
   searchResults: [],
-  returnSearchResults: [],
-  isSearching: false,
+  isLoading: false,
 
   // Actions
-  setSearchParams: (params) => set((state) => ({
+  setSearchParams: (params) => set(state => ({
     searchParams: { ...state.searchParams, ...params }
   })),
 
   setSearchResults: (results) => set({ searchResults: results }),
 
-  setReturnSearchResults: (results) => set({ returnSearchResults: results }),
-
-  setIsSearching: (isSearching) => set({ isSearching }),
-
-  clearSearch: () => set({ 
-    searchResults: [],
-    returnSearchResults: [],
-    searchParams: {
-      departure: '',
-      arrival: '',
-      date: new Date(),
-      returnDate: null,
-      passengers: 1,
-      isRoundTrip: false
-    }
-  })
+  setLoading: (isLoading) => set({ isLoading })
 }))
 
-// Store de réservation
-export const useBookingStore = create((set) => ({
-  currentTrip: null,
+// Store de sélection de siège
+export const useSeatSelectionStore = create((set, get) => ({
   selectedSeats: [],
-  bookingData: null,
-  paymentMethod: null,
-  returnTrip: null,
-  returnSelectedSeats: [],
-  bookingStep: 'outbound', // 'outbound', 'return', 'seats', 'recap', 'payment'
-
-  // Actions
-  setCurrentTrip: (trip) => set({ currentTrip: trip }),
-
-  setSelectedSeats: (seats) => set({ selectedSeats: seats }),
-
-  setBookingData: (data) => set({ bookingData: data }),
-
-  setPaymentMethod: (method) => set({ paymentMethod: method }),
-
-  setReturnTrip: (trip) => set({ returnTrip: trip }),
-
-  setReturnSelectedSeats: (seats) => set({ returnSelectedSeats: seats }),
-
-  setBookingStep: (step) => set({ bookingStep: step }),
-
-  clearBooking: () => set({
-    currentTrip: null,
-    selectedSeats: [],
-    bookingData: null,
-    paymentMethod: null,
-    returnTrip: null,
-    returnSelectedSeats: [],
-    bookingStep: 'outbound'
-  }),
-
-  getTotalPrice: () => {
-    const { currentTrip, selectedSeats, returnTrip, returnSelectedSeats } = useBookingStore.getState()
-    let total = 0
-    
-    if (currentTrip && selectedSeats.length) {
-      total += currentTrip.prix * selectedSeats.length
-    }
-    
-    if (returnTrip && returnSelectedSeats.length) {
-      total += returnTrip.prix * returnSelectedSeats.length
-    }
-    
-    return total
-  }
-}))
-
-// Store pour les agences
-export const useAgencyStore = create((set) => ({
-  agency: null,
-  trips: [],
+  seatMap: [],
   isLoading: false,
 
   // Actions
-  setAgency: (agency) => set({ agency }),
+  selectSeat: (seatNumber) => set(state => {
+    const isSelected = state.selectedSeats.includes(seatNumber)
+    return {
+      selectedSeats: isSelected
+        ? state.selectedSeats.filter(seat => seat !== seatNumber)
+        : [...state.selectedSeats, seatNumber]
+    }
+  }),
 
-  setTrips: (trips) => set({ trips }),
+  clearSelectedSeats: () => set({ selectedSeats: [] }),
 
-  setIsLoading: (isLoading) => set({ isLoading }),
+  setSeatMap: (seatMap) => set({ seatMap }),
 
-  addTrip: (trip) => set((state) => ({
-    trips: [...state.trips, trip]
-  })),
+  setLoading: (isLoading) => set({ isLoading })
+}))
 
-  updateTrip: (updatedTrip) => set((state) => ({
-    trips: state.trips.map(trip => 
-      trip.id === updatedTrip.id ? updatedTrip : trip
-    )
-  })),
-
-  removeTrip: (tripId) => set((state) => ({
-    trips: state.trips.filter(trip => trip.id !== tripId)
-  }))
+// Store de réservation en cours
+export const useBookingStore = create((set, get) => ({
+  currentTrip: null,
+  returnTrip: null,
+  bookingStep: 'selection', // 'selection', 'seats', 'payment', 'confirmation'
+  
+  // Actions
+  setCurrentTrip: (trip) => set({ currentTrip: trip }),
+  
+  setReturnTrip: (trip) => set({ returnTrip: trip }),
+  
+  setBookingStep: (step) => set({ bookingStep: step }),
+  
+  clearBooking: () => set({ 
+    currentTrip: null, 
+    returnTrip: null, 
+    bookingStep: 'selection' 
+  })
 }))
