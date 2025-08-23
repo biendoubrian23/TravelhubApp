@@ -13,156 +13,12 @@ export const useAuthStore = create(devtools((set, get) => ({
     isAuthenticated: !!user 
   }),
 
-  signOut: async () => {
-    try {
-      // Importer Supabase
-      const { supabase } = await import('../services/supabase')
-      
-      // Déconnecter de Supabase
-      const { error } = await supabase.auth.signOut()
-      
-      if (error) {
-        console.error('Erreur lors de la déconnexion:', error)
-        // Même en cas d'erreur, nettoyer le store local
-      }
-      
-      // Nettoyer le store
-      set({ 
-        user: null, 
-        isAuthenticated: false 
-      })
-      
-      console.log('Déconnexion réussie')
-    } catch (error) {
-      console.error('Erreur lors de la déconnexion:', error)
-      // Nettoyer le store même en cas d'erreur
-      set({ 
-        user: null, 
-        isAuthenticated: false 
-      })
-    }
-  },
+  signOut: () => set({ 
+    user: null, 
+    isAuthenticated: false 
+  }),
 
-  setLoading: (isLoading) => set({ isLoading }),
-
-  // Fonction de connexion
-  signIn: async (email, password) => {
-    try {
-      set({ isLoading: true })
-      
-      // Importer Supabase et authService
-      const { supabase } = await import('../services/supabase')
-      const { authService } = await import('../services/supabase')
-      
-      console.log('Tentative de connexion pour:', email)
-      
-      // Appeler la fonction de connexion du service
-      const { data, error } = await authService.signIn(email, password)
-      
-      if (error) {
-        console.error('Erreur de connexion:', error)
-        set({ isLoading: false })
-        throw error
-      }
-      
-      if (data?.user) {
-        console.log('Connexion réussie pour:', data.user.email)
-        set({ 
-          user: data.user, 
-          isAuthenticated: true, 
-          isLoading: false 
-        })
-        return { data, error: null }
-      }
-      
-      set({ isLoading: false })
-      return { data, error }
-    } catch (error) {
-      console.error('Erreur lors de la connexion:', error)
-      set({ isLoading: false })
-      throw error
-    }
-  },
-
-  // Fonction d'inscription
-  signUp: async (email, password, userData = {}) => {
-    try {
-      set({ isLoading: true })
-      
-      // Importer authService
-      const { authService } = await import('../services/supabase')
-      
-      console.log('Tentative d\'inscription pour:', email)
-      
-      // Appeler la fonction d'inscription du service
-      const { data, error } = await authService.signUp(email, password, userData)
-      
-      if (error) {
-        console.error('Erreur d\'inscription:', error)
-        set({ isLoading: false })
-        throw error
-      }
-      
-      if (data?.user) {
-        console.log('Inscription réussie pour:', data.user.email)
-        set({ 
-          user: data.user, 
-          isAuthenticated: true, 
-          isLoading: false 
-        })
-        return { data, error: null }
-      }
-      
-      set({ isLoading: false })
-      return { data, error }
-    } catch (error) {
-      console.error('Erreur lors de l\'inscription:', error)
-      set({ isLoading: false })
-      throw error
-    }
-  },
-
-  // Fonction d'initialisation pour vérifier l'état d'authentification
-  initialize: async () => {
-    try {
-      set({ isLoading: true })
-      
-      // Importer Supabase ici pour éviter les imports circulaires
-      const { supabase } = await import('../services/supabase')
-      
-      // Utiliser getSession au lieu de getUser pour éviter l'erreur "Auth session missing!"
-      const { data: { session }, error } = await supabase.auth.getSession()
-      
-      if (error) {
-        console.warn('Erreur lors de la récupération de la session:', error)
-        set({ user: null, isAuthenticated: false, isLoading: false })
-        return
-      }
-      
-      if (session?.user) {
-        console.log('Session utilisateur trouvée:', session.user.email)
-        set({ user: session.user, isAuthenticated: true, isLoading: false })
-      } else {
-        console.log('Aucune session utilisateur active')
-        set({ user: null, isAuthenticated: false, isLoading: false })
-      }
-
-      // Écouter les changements d'état d'authentification
-      supabase.auth.onAuthStateChange((event, session) => {
-        console.log('Changement d\'état auth:', event, session?.user?.email || 'Aucun utilisateur')
-        
-        if (session?.user) {
-          set({ user: session.user, isAuthenticated: true })
-        } else {
-          set({ user: null, isAuthenticated: false })
-        }
-      })
-      
-    } catch (error) {
-      console.error('Erreur lors de l\'initialisation de l\'auth:', error)
-      set({ user: null, isAuthenticated: false, isLoading: false })
-    }
-  }
+  setLoading: (isLoading) => set({ isLoading })
 }), {
   name: 'auth-store'
 }))
@@ -300,8 +156,7 @@ export const useBookingsStore = create(devtools((set, get) => ({
   loadBookings: async (user) => {
     set({ isLoading: true })
     try {
-      const currentState = get();
-      const currentBookings = Array.isArray(currentState.bookings) ? currentState.bookings : []; // Préserver les réservations existantes
+      const currentBookings = get().bookings; // Préserver les réservations existantes
       
       if (user?.id) {
         console.log('🔄 Chargement des réservations depuis Supabase pour:', user.email);
@@ -354,8 +209,7 @@ export const useBookingsStore = create(devtools((set, get) => ({
             }).filter(booking => booking.id); // Filtrer les réservations sans ID
             
             // Combiner avec les réservations locales (si elles ne sont pas déjà synchronisées)
-            const safeCurrentBookings = Array.isArray(currentBookings) ? currentBookings : [];
-            const localOnlyBookings = safeCurrentBookings.filter(local => 
+            const localOnlyBookings = currentBookings.filter(local => 
               !transformedBookings.find(db => db.supabaseId === local.supabaseId)
             );
             
@@ -393,15 +247,11 @@ export const useBookingsStore = create(devtools((set, get) => ({
 
   getBookingsByStatus: (status) => {
     const { bookings } = get()
-    if (!Array.isArray(bookings)) {
-      console.warn('getBookingsByStatus - bookings is not an array:', typeof bookings);
-      return [];
-    }
     return bookings.filter(booking => booking.status === status)
   },
 
   removeBooking: (bookingId) => set(state => ({
-    bookings: Array.isArray(state.bookings) ? state.bookings.filter(booking => booking.id !== bookingId) : []
+    bookings: state.bookings.filter(booking => booking.id !== bookingId)
   })),
 
   updateBookingStatus: (bookingId, status) => set(state => ({
@@ -425,26 +275,17 @@ export const useSearchStore = create((set) => ({
     busType: 'all' // 'all', 'standard', 'vip'
   },
   results: [],
-  searchResults: [],
-  returnSearchResults: [],
   isLoading: false,
-  isSearching: false,
 
   setSearchParams: (params) => set(state => ({
     searchParams: { ...state.searchParams, ...params }
   })),
 
   setResults: (results) => set({ results }),
-  
-  setSearchResults: (searchResults) => set({ searchResults: Array.isArray(searchResults) ? searchResults : [] }),
-  
-  setReturnSearchResults: (returnSearchResults) => set({ returnSearchResults: Array.isArray(returnSearchResults) ? returnSearchResults : [] }),
 
   setLoading: (isLoading) => set({ isLoading }),
-  
-  setIsSearching: (isSearching) => set({ isSearching }),
 
-  clearResults: () => set({ results: [], searchResults: [], returnSearchResults: [] })
+  clearResults: () => set({ results: [] })
 }))
 
 // Store de sélection de sièges
@@ -458,15 +299,14 @@ export const useSeatSelectionStore = create((set, get) => ({
   setSeatMap: (seatMap) => set({ seatMap }),
 
   selectSeat: (seat) => set(state => {
-    const safeSelectedSeats = Array.isArray(state.selectedSeats) ? state.selectedSeats : [];
-    const isSelected = safeSelectedSeats.find(s => s.id === seat.id)
+    const isSelected = state.selectedSeats.find(s => s.id === seat.id)
     if (isSelected) {
       return {
-        selectedSeats: safeSelectedSeats.filter(s => s.id !== seat.id)
+        selectedSeats: state.selectedSeats.filter(s => s.id !== seat.id)
       }
     } else {
       return {
-        selectedSeats: [...safeSelectedSeats, seat]
+        selectedSeats: [...state.selectedSeats, seat]
       }
     }
   }),
@@ -484,14 +324,10 @@ export const useBookingStore = create((set, get) => ({
   // Données du trajet sélectionné
   trip: null,
   returnTrip: null,
-  currentTrip: null,
   
   // Sièges sélectionnés
   selectedSeats: [],
   returnSelectedSeats: [],
-  
-  // Étape de réservation
-  bookingStep: 'outbound', // 'outbound', 'return', 'seats', 'payment', 'confirmation'
   
   // Données de recherche
   searchParams: {
@@ -513,10 +349,8 @@ export const useBookingStore = create((set, get) => ({
   // Actions
   setTrip: (trip) => set({ trip }),
   setReturnTrip: (returnTrip) => set({ returnTrip }),
-  setCurrentTrip: (currentTrip) => set({ currentTrip }),
   setSelectedSeats: (seats) => set({ selectedSeats: seats }),
   setReturnSelectedSeats: (seats) => set({ returnSelectedSeats: seats }),
-  setBookingStep: (step) => set({ bookingStep: step }),
   setSearchParams: (params) => set(state => ({
     searchParams: { ...state.searchParams, ...params }
   })),

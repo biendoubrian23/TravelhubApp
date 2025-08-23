@@ -43,6 +43,12 @@ const HomeScreen = ({ navigation }) => {
 
   const handleReturnDateSelect = (date) => {
     const selectedDate = new Date(date.dateString)
+    
+    if (!searchParams.date) {
+      Alert.alert('Erreur', 'Veuillez d\'abord sélectionner une date de départ')
+      return
+    }
+    
     const departureDate = new Date(searchParams.date)
     
     if (selectedDate <= departureDate) {
@@ -52,6 +58,13 @@ const HomeScreen = ({ navigation }) => {
     
     setSearchParams({ returnDate: selectedDate })
     setShowReturnCalendar(false)
+  }
+
+  const handleCancelReturn = () => {
+    setSearchParams({ 
+      isRoundTrip: false,
+      returnDate: null 
+    })
   }
 
   const handlePassengerChange = (count) => {
@@ -230,7 +243,7 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.optionContent}>
                 <Text style={styles.optionLabel}>Aller</Text>
                 <Text style={styles.optionValue}>
-                  {formatDate(searchParams.date, 'short')}
+                  {searchParams.date ? formatDate(searchParams.date, 'short') : 'Sélectionner'}
                 </Text>
               </View>
               <Ionicons name="calendar" size={20} color={COLORS.primary} />
@@ -240,6 +253,11 @@ const HomeScreen = ({ navigation }) => {
               style={[styles.dateSelector, { flex: 1 }]}
               onPress={() => {
                 if (!searchParams.isRoundTrip) {
+                  // Vérifier qu'une date de départ est sélectionnée
+                  if (!searchParams.date) {
+                    Alert.alert('Information', 'Veuillez d\'abord sélectionner une date de départ')
+                    return
+                  }
                   // Activer le mode aller-retour
                   setSearchParams({ 
                     isRoundTrip: true,
@@ -259,11 +277,22 @@ const HomeScreen = ({ navigation }) => {
                   }
                 </Text>
               </View>
-              {searchParams.isRoundTrip ? (
-                <Ionicons name="calendar" size={20} color={COLORS.primary} />
-              ) : (
-                <Ionicons name="add" size={20} color={COLORS.success} />
-              )}
+              <View style={styles.optionIcons}>
+                {searchParams.isRoundTrip ? (
+                  <>
+                    <Ionicons name="calendar" size={20} color={COLORS.primary} />
+                    <TouchableOpacity 
+                      style={styles.cancelReturnIcon}
+                      onPress={handleCancelReturn}
+                      hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                    >
+                      <Ionicons name="close" size={16} color={COLORS.text.secondary} />
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <Ionicons name="add" size={20} color={COLORS.success} />
+                )}
+              </View>
             </TouchableOpacity>
           </View>
 
@@ -350,10 +379,12 @@ const HomeScreen = ({ navigation }) => {
           <Calendar
             onDayPress={handleDateSelect}
             markedDates={{
-              [searchParams.date.toISOString().split('T')[0]]: {
-                selected: true,
-                selectedColor: COLORS.primary
-              }
+              ...(searchParams.date && {
+                [searchParams.date.toISOString().split('T')[0]]: {
+                  selected: true,
+                  selectedColor: COLORS.primary
+                }
+              })
             }}
             minDate={new Date().toISOString().split('T')[0]}
             theme={{
@@ -377,11 +408,13 @@ const HomeScreen = ({ navigation }) => {
           <Calendar
             onDayPress={handleReturnDateSelect}
             markedDates={{
-              [searchParams.date.toISOString().split('T')[0]]: {
-                marked: true,
-                dotColor: COLORS.primary,
-                selectedColor: 'transparent'
-              },
+              ...(searchParams.date && {
+                [searchParams.date.toISOString().split('T')[0]]: {
+                  marked: true,
+                  dotColor: COLORS.primary,
+                  selectedColor: 'transparent'
+                }
+              }),
               ...(searchParams.returnDate && {
                 [searchParams.returnDate.toISOString().split('T')[0]]: {
                   selected: true,
@@ -389,7 +422,7 @@ const HomeScreen = ({ navigation }) => {
                 }
               })
             }}
-            minDate={new Date(searchParams.date.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+            minDate={searchParams.date ? new Date(searchParams.date.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
             theme={{
               selectedDayBackgroundColor: COLORS.success,
               todayTextColor: COLORS.primary,
@@ -582,6 +615,19 @@ const styles = StyleSheet.create({
   addReturnText: {
     color: COLORS.success,
     fontWeight: '600',
+  },
+
+  optionIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+
+  cancelReturnIcon: {
+    marginLeft: SPACING.xs,
+    padding: 2,
+    borderRadius: 10,
+    backgroundColor: COLORS.surface,
   },
 
   optionSelector: {

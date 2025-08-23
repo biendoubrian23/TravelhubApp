@@ -8,34 +8,45 @@ export const formatPrice = (price) => {
 export const formatDate = (date, format = 'default') => {
   if (!date) return ''
   
-  const dateObj = typeof date === 'string' ? new Date(date) : date
-  
-  if (format === 'DD/MM à HH:mm') {
-    const day = dateObj.getDate().toString().padStart(2, '0')
-    const month = (dateObj.getMonth() + 1).toString().padStart(2, '0')
-    const hours = dateObj.getHours().toString().padStart(2, '0')
-    const minutes = dateObj.getMinutes().toString().padStart(2, '0')
-    return `${day}/${month} à ${hours}:${minutes}`
-  }
-  
-  // Format court pour l'écran d'accueil
-  if (format === 'short') {
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date
+    
+    // Vérifier si la date est valide
+    if (isNaN(dateObj.getTime())) {
+      console.warn('helpers.js - Date invalide:', date);
+      return '';
+    }
+    
+    if (format === 'DD/MM à HH:mm') {
+      const day = dateObj.getDate().toString().padStart(2, '0')
+      const month = (dateObj.getMonth() + 1).toString().padStart(2, '0')
+      const hours = dateObj.getHours().toString().padStart(2, '0')
+      const minutes = dateObj.getMinutes().toString().padStart(2, '0')
+      return `${day}/${month} à ${hours}:${minutes}`
+    }
+    
+    // Format court pour l'écran d'accueil
+    if (format === 'short') {
+      const options = {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'long'
+      }
+      return dateObj.toLocaleDateString('fr-FR', options)
+    }
+    
     const options = {
       weekday: 'short',
       day: 'numeric',
-      month: 'long'
+      month: 'short',
+      year: 'numeric'
     }
+    
     return dateObj.toLocaleDateString('fr-FR', options)
+  } catch (error) {
+    console.warn('helpers.js - Erreur formatage date:', error, { date, format });
+    return '';
   }
-  
-  const options = {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
-  }
-  
-  return dateObj.toLocaleDateString('fr-FR', options)
 }
 
 // Formatage des heures

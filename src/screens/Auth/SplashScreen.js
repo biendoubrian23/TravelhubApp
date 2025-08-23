@@ -12,10 +12,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../../constants';
+import { useAuthStore } from '../../store';
 
 const { width, height } = Dimensions.get('window');
 
 const SplashScreen = ({ navigation }) => {
+  const { isAuthenticated, user } = useAuthStore();
+  
   // Animations pour le bus
   const busPosition = useRef(new Animated.Value(-120)).current;
   const busRotation = useRef(new Animated.Value(0)).current;
@@ -235,9 +238,15 @@ const SplashScreen = ({ navigation }) => {
       ]).start();
     }, 4000);
 
-    // Navigation directe vers l'écran de connexion client
+    // Navigation conditionnelle basée sur l'état d'authentification
     setTimeout(() => {
-      navigation.replace('Login', { userType: 'client' });
+      if (isAuthenticated && user) {
+        console.log('SplashScreen - Utilisateur déjà connecté, navigation vers ClientMain');
+        navigation.replace('ClientMain');
+      } else {
+        console.log('SplashScreen - Aucun utilisateur connecté, navigation vers Login');
+        navigation.replace('Login', { userType: 'client' });
+      }
     }, 5800);
   };
 

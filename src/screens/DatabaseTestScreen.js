@@ -12,6 +12,7 @@ import { Button } from '../components';
 import { COLORS, SPACING } from '../constants';
 import { useAuthStore, useBookingsStore } from '../store';
 import { bookingService } from '../services/bookingService';
+import { testDataService } from '../services/testDataService';
 
 const DatabaseTestScreen = ({ navigation }) => {
   const { user } = useAuthStore();
@@ -35,8 +36,13 @@ const DatabaseTestScreen = ({ navigation }) => {
     addLog('🧪 Début création données de test...', 'info');
 
     try {
-      await bookingService.createTestData(user.id);
-      addLog('✅ Données de test créées avec succès!', 'success');
+      const testBookings = await testDataService.createTestDataForUser(user.id);
+      if (testBookings.length > 0) {
+        addLog('✅ Données de test créées avec succès!', 'success');
+        addLog(`📋 ${testBookings.length} réservation(s) créée(s)`, 'info');
+      } else {
+        addLog('ℹ️ Aucune donnée de test créée (déjà existantes)', 'warning');
+      }
     } catch (error) {
       addLog(`❌ Erreur: ${error.message}`, 'error');
     } finally {
@@ -61,6 +67,36 @@ const DatabaseTestScreen = ({ navigation }) => {
     } finally {
       setIsLoadingBookings(false);
     }
+  };
+
+  const cleanTestData = async () => {
+    if (!user?.id) {
+      Alert.alert('Erreur', 'Utilisateur non connecté');
+      return;
+    }
+
+    Alert.alert(
+      'Confirmation',
+      'Voulez-vous supprimer toutes les données de test ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Supprimer', 
+          style: 'destructive',
+          onPress: async () => {
+            addLog('🧹 Nettoyage des données de test...', 'info');
+            try {
+              await testDataService.cleanTestData(user.id);
+              addLog('✅ Données de test supprimées', 'success');
+              // Recharger les réservations pour mettre à jour l'affichage
+              await loadBookings(user);
+            } catch (error) {
+              addLog(`❌ Erreur nettoyage: ${error.message}`, 'error');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const clearLogs = () => {
@@ -120,6 +156,13 @@ const DatabaseTestScreen = ({ navigation }) => {
             onPress={testLoadBookings}
             loading={isLoadingBookings}
             style={styles.actionButton}
+          />
+          
+          <Button
+            title="Nettoyer données de test"
+            onPress={cleanTestData}
+            style={[styles.actionButton, styles.dangerButton]}
+            textStyle={styles.dangerButtonText}
           />
           
           <Button
@@ -234,6 +277,12 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: COLORS.primary,
+  },
+  dangerButton: {
+    backgroundColor: COLORS.error,
+  },
+  dangerButtonText: {
+    color: COLORS.surface,
   },
   logsHeader: {
     flexDirection: 'row',

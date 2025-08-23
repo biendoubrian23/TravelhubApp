@@ -52,29 +52,78 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
       return null;
     }
 
+    // Fonction helper pour formater les dates de manière sécurisée
+    const safeFormatDateTime = (date, time, fallbackDate = null) => {
+      try {
+        if (date && time) {
+          // Si nous avons date et time séparés
+          return `${date}T${time}:00Z`;
+        } else if (date) {
+          // Si nous avons seulement une date (pourrait être déjà un datetime)
+          const dateObj = new Date(date);
+          return dateObj.toISOString();
+        }
+        // Fallback vers la date fournie ou nouvelle date
+        return fallbackDate || new Date().toISOString();
+      } catch (error) {
+        console.warn('BookingsScreen - Erreur formatage date:', error, { date, time });
+        return fallbackDate || new Date().toISOString();
+      }
+    };
+
     return {
       id: booking.id || 'unknown',
       booking_reference: booking.id || booking.bookingReference || 'unknown',
       trip: {
-        departure_city: booking.departure || 'Ville inconnue',
-        arrival_city: booking.arrival || 'Ville inconnue',
-        departure_time: booking.date && booking.time ? `${booking.date}T${booking.time}:00Z` : new Date().toISOString(),
-        arrival_time: booking.date && booking.time ? `${booking.date}T${booking.time}:00Z` : new Date().toISOString(),
-        agency: { name: booking.agency || 'TravelHub' },
-        bus_type: booking.busType || 'standard'
+        departure_city: booking.departure || booking.departure_city || 'Ville inconnue',
+        arrival_city: booking.arrival || booking.arrival_city || 'Ville inconnue',
+        departure_time: safeFormatDateTime(
+          booking.departure_time || booking.date, 
+          booking.time,
+          booking.created_at
+        ),
+        arrival_time: safeFormatDateTime(
+          booking.arrival_time || booking.date, 
+          booking.time,
+          booking.created_at
+        ),
+        agency: { name: booking.agency?.name || booking.agency || 'TravelHub' },
+        bus_type: booking.bus_type || booking.busType || 'standard'
       },
-      seat_number: booking.seatNumber || 'N/A',
-      total_price_fcfa: booking.price || 0,
-      booking_status: booking.status === 'upcoming' ? 'confirmed' : (booking.status || 'pending'),
-      payment_status: booking.paymentStatus || 'completed',
-      created_at: booking.bookingDate || new Date().toISOString()
+      seat_number: booking.seat_number || booking.seatNumber || 'N/A',
+      total_price_fcfa: booking.total_price_fcfa || booking.price || 0,
+      booking_status: booking.booking_status || (booking.status === 'upcoming' ? 'confirmed' : (booking.status || 'pending')),
+      payment_status: booking.payment_status || booking.paymentStatus || 'completed',
+      created_at: safeFormatDateTime(booking.created_at || booking.bookingDate)
     };
   };
 
   // Adapter toutes les réservations avec filtrage des valeurs null
-  const adaptedBookings = bookings
+  const safeBookings = Array.isArray(bookings) ? bookings : [];
+  console.log('BookingsScreen - Type de bookings:', typeof bookings, 'Is Array:', Array.isArray(bookings), 'Length:', safeBookings.length);
+  
+  const adaptedBookings = safeBookings
     .map(adaptBookingData)
     .filter(booking => booking !== null);
+
+  const filteredBookings = adaptedBookings.filter(booking => {
+    // Protection supplémentaire contre les objets mal formés
+    if (!booking || !booking.trip) {
+      console.warn('BookingsScreen - Réservation ou trip manquant:', booking);
+      return false;
+    }
+
+    const departure = booking.trip.departure_city || '';
+    const arrival = booking.trip.arrival_city || '';
+    const reference = booking.booking_reference || '';
+    
+    const matchesSearch = departure.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         arrival.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         reference.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (filter === 'all') return matchesSearch;
+    return matchesSearch && booking.booking_status === filter;
+  });
   
   console.log('BookingsScreen - Nombre de réservations:', bookings.length);
   console.log('BookingsScreen - Réservations brutes:', bookings);
@@ -100,25 +149,6 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
       default: return status;
     }
   };
-
-  const filteredBookings = adaptedBookings.filter(booking => {
-    // Protection supplémentaire contre les objets mal formés
-    if (!booking || !booking.trip) {
-      console.warn('BookingsScreen - Réservation ou trip manquant:', booking);
-      return false;
-    }
-
-    const departure = booking.trip.departure_city || '';
-    const arrival = booking.trip.arrival_city || '';
-    const reference = booking.booking_reference || '';
-    
-    const matchesSearch = departure.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         arrival.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         reference.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    if (filter === 'all') return matchesSearch;
-    return matchesSearch && booking.booking_status === filter;
-  });
 
   const renderBookingCard = (booking) => (
     <Card key={booking.id} style={{ marginBottom: SPACING.md, elevation: 2 }}>

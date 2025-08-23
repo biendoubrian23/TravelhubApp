@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -36,22 +36,25 @@ const PaymentScreen = ({ route, navigation }) => {
   const [cardName, setCardName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
 
-  console.log('PaymentScreen - Data received:', { 
-    trip, 
-    outboundTrip, 
-    returnTrip, 
-    selectedSeats, 
-    returnSelectedSeats, 
-    totalPrice, 
-    isRoundTrip,
-    searchParams 
-  });
-  console.log('PaymentScreen - selectedSeats details:', selectedSeats);
-  console.log('PaymentScreen - returnSelectedSeats details:', returnSelectedSeats);
-  console.log('PaymentScreen - selectedSeats length:', selectedSeats?.length);
-  console.log('PaymentScreen - returnSelectedSeats length:', returnSelectedSeats?.length);
-  console.log('PaymentScreen - searchParams:', searchParams);
-  console.log('PaymentScreen - isRoundTrip:', isRoundTrip);
+  // Déplacer les logs dans useEffect pour éviter la répétition
+  useEffect(() => {
+    console.log('PaymentScreen - Data received:', { 
+      trip, 
+      outboundTrip, 
+      returnTrip, 
+      selectedSeats, 
+      returnSelectedSeats, 
+      totalPrice, 
+      isRoundTrip,
+      searchParams 
+    });
+    console.log('PaymentScreen - selectedSeats details:', selectedSeats);
+    console.log('PaymentScreen - returnSelectedSeats details:', returnSelectedSeats);
+    console.log('PaymentScreen - selectedSeats length:', selectedSeats?.length);
+    console.log('PaymentScreen - returnSelectedSeats length:', returnSelectedSeats?.length);
+    console.log('PaymentScreen - searchParams:', searchParams);
+    console.log('PaymentScreen - isRoundTrip:', isRoundTrip);
+  }, []); // Exécuter seulement au montage du composant
 
   const paymentMethods = [
     {

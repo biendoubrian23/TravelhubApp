@@ -43,6 +43,21 @@ const ResultsScreen = ({ navigation, route }) => {
   const [outboundSeats, setOutboundSeats] = useState([]) // Pour stocker les sièges aller sélectionnés
 
   useEffect(() => {
+    // Vérifier et initialiser la date si elle est manquante
+    if (!searchParams.date) {
+      console.log('🗓️ ResultsScreen - Date manquante, initialisation avec date du jour')
+      const today = new Date()
+      setSearchParams({
+        ...searchParams,
+        date: today
+      })
+      setLocalSearchParams({
+        ...searchParams,
+        date: today
+      })
+      return // Arrêter ici, l'effet se redéclenchera avec la nouvelle date
+    }
+    
     generateDateCarousel()
     searchTrips()
     
@@ -59,7 +74,7 @@ const ResultsScreen = ({ navigation, route }) => {
       setBookingStep('outbound')
       setOutboundSeats([])
     }
-  }, [route.params?.continueReturnSelection])
+  }, [route.params?.continueReturnSelection, searchParams.date])
 
   // Régénérer le calendrier quand on passe du mode aller au mode retour
   useEffect(() => {
@@ -86,7 +101,26 @@ const ResultsScreen = ({ navigation, route }) => {
   const generateDateCarousel = () => {
     const dates = []
     // Utiliser la date de retour si on affiche les trajets retour, sinon la date de départ
-    const baseDate = new Date(showingReturnTrips ? searchParams.returnDate : searchParams.date)
+    const selectedDate = showingReturnTrips ? searchParams.returnDate : searchParams.date
+    
+    // Si aucune date n'est sélectionnée, utiliser aujourd'hui par défaut
+    if (!selectedDate) {
+      console.warn('generateDateCarousel - Aucune date sélectionnée, utilisation de la date du jour')
+      const today = new Date()
+      const baseDate = today
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(baseDate)
+        date.setDate(baseDate.getDate() + i)
+        dates.push({
+          date,
+          price: Math.floor(Math.random() * 2000) + 2500
+        })
+      }
+      setDateCarousel(dates)
+      return
+    }
+    
+    const baseDate = new Date(selectedDate)
     const today = new Date()
     today.setHours(0, 0, 0, 0) // Reset time to compare only dates
     
@@ -119,6 +153,7 @@ const ResultsScreen = ({ navigation, route }) => {
   }
 
   const searchTrips = async () => {
+    console.log('🔍 ResultsScreen - Début de la recherche de trajets')
     setIsSearching(true)
     try {
       // Rechercher les trajets dans la base de données uniquement
@@ -128,6 +163,7 @@ const ResultsScreen = ({ navigation, route }) => {
         date: searchParams.date
       })
       
+      console.log('✅ ResultsScreen - Trajets trouvés:', trips?.length || 0)
       setSearchResults(trips)
       
       // Si c'est un aller-retour, rechercher aussi les trajets de retour
@@ -137,11 +173,12 @@ const ResultsScreen = ({ navigation, route }) => {
           arrival: searchParams.departure,
           date: searchParams.returnDate
         })
+        console.log('✅ ResultsScreen - Trajets retour trouvés:', returnTrips?.length || 0)
         setReturnSearchResults(returnTrips)
       }
       
     } catch (error) {
-      console.error('Erreur lors de la recherche des trajets:', error)
+      console.error('❌ ResultsScreen - Erreur lors de la recherche des trajets:', error)
       Alert.alert(
         'Erreur de connexion', 
         'Impossible de récupérer les trajets depuis la base de données. Veuillez vérifier votre connexion internet et réessayer.'
@@ -150,15 +187,16 @@ const ResultsScreen = ({ navigation, route }) => {
       setSearchResults([])
       setReturnSearchResults([])
     } finally {
+      console.log('🏁 ResultsScreen - Fin de la recherche, setIsSearching(false)')
       setIsSearching(false)
     }
   }
 
   const getCurrentTrips = () => {
     if (showingReturnTrips) {
-      return returnSearchResults
+      return Array.isArray(returnSearchResults) ? returnSearchResults : []
     }
-    return searchResults
+    return Array.isArray(searchResults) ? searchResults : []
   }
 
   const filteredTrips = getCurrentTrips().filter(trip => {
@@ -281,6 +319,12 @@ const ResultsScreen = ({ navigation, route }) => {
     // Utiliser la date appropriée selon le mode (aller ou retour)
     const currentDate = showingReturnTrips ? searchParams.returnDate : searchParams.date
     
+    // Vérifier que currentDate n'est pas null avant de l'utiliser
+    if (!currentDate || !selectedDate) {
+      console.warn('handleDateSelect - Date manquante:', { currentDate, selectedDate })
+      return
+    }
+    
     // Ne pas permettre de sélectionner la même date
     if (selectedDate.toDateString() === new Date(currentDate).toDateString()) {
       return
@@ -382,7 +426,15 @@ const ResultsScreen = ({ navigation, route }) => {
   }
 
   const renderDateCarouselItem = ({ item, index }) => {
-    const isSelected = item.date.toDateString() === localSearchParams.date.toDateString()
+    // Utiliser searchParams directement au lieu de localSearchParams pour éviter les problèmes de sync
+    const currentDate = showingReturnTrips ? searchParams.returnDate : searchParams.date
+    
+    // Protection simple : vérifier que les dates existent avant toDateString
+    if (!item?.date || !currentDate) {
+      return null // Ne pas afficher l'item si les dates sont manquantes
+    }
+    
+    const isSelected = item.date.toDateString() === new Date(currentDate).toDateString()
     
     return (
       <TouchableOpacity
