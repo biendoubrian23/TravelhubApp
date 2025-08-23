@@ -123,7 +123,10 @@ const BookingDetailsScreen = ({ route, navigation }) => {
           text: 'Oui, annuler',
           style: 'destructive',
           onPress: () => {
-            cancelBooking(safeBooking.id);
+            // Utiliser supabaseId en priorité (UUID de la BD), sinon id local
+            const bookingIdToCancel = booking.supabaseId || booking.id;
+            console.log('🗑️ Annulation avec ID:', bookingIdToCancel, 'Type:', typeof bookingIdToCancel);
+            cancelBooking(bookingIdToCancel);
             navigation.goBack();
           }
         }

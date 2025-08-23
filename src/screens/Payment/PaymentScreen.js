@@ -25,6 +25,7 @@ const PaymentScreen = ({ route, navigation }) => {
     isRoundTrip = false, // Valeur par défaut
     searchParams 
   } = route.params;
+  
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);

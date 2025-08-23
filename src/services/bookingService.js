@@ -390,6 +390,20 @@ export const bookingService = {
   // Annuler une réservation
   async cancelBooking(bookingId, reason = '') {
     try {
+      // Validation de l'ID
+      if (!bookingId) {
+        throw new Error('ID de réservation manquant');
+      }
+      
+      // Vérifier si c'est un UUID valide (36 caractères avec des tirets)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(bookingId)) {
+        console.error('❌ ID invalide pour annulation:', bookingId, 'Type:', typeof bookingId);
+        throw new Error(`ID de réservation invalide: ${bookingId}. Attendu UUID format.`);
+      }
+      
+      console.log('✅ ID valide pour annulation:', bookingId);
+      
       // 1. Récupérer les détails de la réservation
       const booking = await this.getBookingById(bookingId)
       

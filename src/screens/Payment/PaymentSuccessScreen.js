@@ -18,6 +18,9 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
   const { booking, trip, selectedSeats, totalPrice, paymentMethod } = route.params;
   const { addBooking } = useBookingsStore();
   const { user } = useAuthStore();
+  
+  // État pour éviter la création multiple de réservations
+  const [bookingCreated, setBookingCreated] = useState(false);
 
   // Animations
   const [checkAnimation] = useState(new Animated.Value(0));
@@ -47,6 +50,15 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
     ]).start();
 
     const addBookingToHistory = async () => {
+      // Vérifier si la réservation a déjà été créée pour éviter les doublons
+      if (bookingCreated) {
+        console.log('🛑 Réservation déjà créée, pas de duplication');
+        return;
+      }
+
+      setBookingCreated(true); // Marquer comme créé immédiatement
+      console.log('🚀 Création de la réservation après confirmation de paiement...');
+
       // Ajouter la réservation à l'historique et à Supabase
       const currentDate = new Date();
       const formattedDate = currentDate.toISOString().split('T')[0];
@@ -76,19 +88,22 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
         busType: trip?.bus_type || 'VIP',
         agency: trip?.agency?.name || 'TravelHub',
         seatNumber: formattedSeats,
+        selectedSeats: selectedSeats, // Ajouter les sièges sélectionnés
         paymentMethod: paymentMethod || 'Paiement simulé',
         duration: trip?.duration || '3h 30min',
         trip: trip || {}, // Fournir un objet vide si trip est undefined
-        trip_id: trip?.id // Trip ID peut être undefined
+        tripId: trip?.id || null, // Utiliser tripId au lieu de trip_id pour correspondre au service
+        totalPrice: totalPrice || 0 // Ajouter totalPrice pour le service
       };
 
       try {
         // Passer l'utilisateur pour sauvegarder dans Supabase si connecté
         const savedBooking = await addBooking(newBooking, user);
-        console.log('Réservation ajoutée avec succès:', savedBooking);
-        console.log('Nouvelle réservation:', JSON.stringify(newBooking, null, 2));
+        console.log('✅ Réservation créée avec succès après paiement:', savedBooking);
+        console.log('📋 Nouvelle réservation:', JSON.stringify(newBooking, null, 2));
       } catch (error) {
-        console.error('Erreur lors de l\'ajout de la réservation:', error);
+        console.error('❌ Erreur lors de l\'ajout de la réservation:', error);
+        setBookingCreated(false); // Réinitialiser en cas d'erreur pour permettre un nouvel essai
       }
     };
 
