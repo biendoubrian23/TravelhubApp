@@ -18,7 +18,9 @@ const TripCard = ({
     prix,
     is_vip,
     agencies,
-    trip_services
+    trip_services,
+    available_seats,
+    total_seats
   } = trip
 
   const duration = calculateDuration(heure_dep, heure_arr)
@@ -86,7 +88,12 @@ const TripCard = ({
       )}
 
       <View style={styles.footer}>
-        <Text style={styles.availabilityText}>4 places disponibles</Text>
+        <Text style={styles.availabilityText}>
+          {available_seats !== undefined 
+            ? `${available_seats} place${available_seats > 1 ? 's' : ''} disponible${available_seats > 1 ? 's' : ''}`
+            : 'Disponibilité à vérifier'
+          }
+        </Text>
         <TouchableOpacity style={styles.detailsButton}>
           <Text style={styles.detailsButtonText}>Voir détails</Text>
           <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
