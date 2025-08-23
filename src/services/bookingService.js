@@ -129,8 +129,7 @@ export const bookingService = {
         // 🆕 Utiliser les vraies informations de l'utilisateur
         passenger_name: userData.full_name || 'Client TravelHub',
         passenger_phone: userData.phone || '+237600000000',
-        passenger_email: userData.email || null,
-        // Retirer passenger_city qui n'existe pas dans la table bookings
+        // Retirer passenger_email car cette colonne n'existe pas dans la table bookings
         total_price_fcfa: bookingData.totalPrice || 0,
         booking_reference: `TH${Date.now()}`,
         booking_status: 'confirmed',
