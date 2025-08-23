@@ -277,11 +277,10 @@ export const bookingService = {
         .from('trips')
         .select(`
           id,
-          ville_depart,
-          ville_arrivee,
-          date,
-          heure_dep,
-          heure_arr,
+          departure_city,
+          arrival_city,
+          departure_time,
+          arrival_time,
           agency_id,
           bus_type
         `)
@@ -315,11 +314,31 @@ export const bookingService = {
         const trip = tripsData?.find(t => t.id === booking.trip_id) || {}
         const agency = agenciesData.find(a => a.id === trip.agency_id) || {}
         
+        // Extraire les heures depuis departure_time et arrival_time
+        const departureTime = trip.departure_time ? new Date(trip.departure_time) : null
+        const arrivalTime = trip.arrival_time ? new Date(trip.arrival_time) : null
+        
+        const heure_dep = departureTime ? departureTime.toLocaleTimeString('fr-FR', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }) : '00:00'
+        
+        const heure_arr = arrivalTime ? arrivalTime.toLocaleTimeString('fr-FR', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }) : '00:00'
+        
+        const date = departureTime ? departureTime.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+        
         console.log(`🔄 Enrichissement booking ${booking.id}:`, {
           booking_trip_id: booking.trip_id,
           found_trip: trip,
-          trip_ville_depart: trip.ville_depart,
-          trip_ville_arrivee: trip.ville_arrivee,
+          departure_city: trip.departure_city,
+          arrival_city: trip.arrival_city,
+          departure_time: trip.departure_time,
+          arrival_time: trip.arrival_time,
+          heure_dep,
+          heure_arr,
           found_agency: agency
         });
         
@@ -327,11 +346,11 @@ export const bookingService = {
           ...booking,
           trips: {
             ...trip,
-            ville_depart: trip.ville_depart || 'Ville inconnue',
-            ville_arrivee: trip.ville_arrivee || 'Ville inconnue',
-            date: trip.date || new Date().toISOString().split('T')[0],
-            heure_dep: trip.heure_dep || '00:00',
-            heure_arr: trip.heure_arr || '00:00',
+            ville_depart: trip.departure_city || 'Ville inconnue',
+            ville_arrivee: trip.arrival_city || 'Ville inconnue',
+            date: date,
+            heure_dep: heure_dep,
+            heure_arr: heure_arr,
             agencies: {
               nom: agency.nom || 'TravelHub'
             }

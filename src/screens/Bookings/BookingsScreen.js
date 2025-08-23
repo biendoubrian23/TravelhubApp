@@ -73,18 +73,18 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
 
     return {
       id: booking.id || 'unknown',
-      booking_reference: booking.id || booking.bookingReference || 'unknown',
+      booking_reference: booking.bookingReference || booking.booking_reference || `TH${booking.id?.slice(-6).toUpperCase()}` || 'UNKNOWN',
       trip: {
         departure_city: booking.departure || booking.departure_city || 'Ville inconnue',
         arrival_city: booking.arrival || booking.arrival_city || 'Ville inconnue',
         departure_time: safeFormatDateTime(
           booking.departure_time || booking.date, 
-          booking.time,
+          booking.time || booking.trip?.heure_dep,
           booking.created_at
         ),
         arrival_time: safeFormatDateTime(
           booking.arrival_time || booking.date, 
-          booking.time,
+          booking.trip?.heure_arr || booking.trip?.heure_dep, // Utiliser heure_arr du trip, fallback sur heure_dep
           booking.created_at
         ),
         agency: { name: booking.agency?.name || booking.agency || 'TravelHub' },

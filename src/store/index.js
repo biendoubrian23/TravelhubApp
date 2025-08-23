@@ -267,15 +267,18 @@ export const useBookingsStore = create(devtools((set, get) => ({
         if (data) {
           console.log('✅ Réservation sauvegardée dans Supabase:', data)
           
-          // Mettre à jour la réservation locale avec l'ID de la BD
+          // Supprimer la réservation locale temporaire et la remplacer par les données BD
           set((state) => {
-            const updatedBookings = state.bookings.map(b => 
-              b.id === booking.id 
-                ? { ...b, supabaseId: data.id, syncedWithDB: true }
-                : b
-            );
-            return { bookings: updatedBookings };
+            const filteredBookings = state.bookings.filter(b => b.id !== booking.id);
+            console.log('🧹 Suppression réservation locale temporaire, reste:', filteredBookings.length);
+            return { bookings: filteredBookings };
           })
+          
+          // Recharger les réservations depuis Supabase pour avoir les vraies données
+          console.log('🔄 Rechargement des réservations depuis BD après sauvegarde');
+          setTimeout(() => {
+            get().loadBookings(user);
+          }, 500);
         }
       } catch (error) {
         console.error('❌ Erreur lors de la sauvegarde:', error)
@@ -353,11 +356,20 @@ export const useBookingsStore = create(devtools((set, get) => ({
               };
             }).filter(booking => booking.id); // Filtrer les réservations sans ID
             
-            // Combiner avec les réservations locales (si elles ne sont pas déjà synchronisées)
+            // Pour éviter les doublons, on privilégie UNIQUEMENT les données Supabase
+            // Les réservations locales ne sont conservées que si elles n'ont pas encore été synchronisées
             const safeCurrentBookings = Array.isArray(currentBookings) ? currentBookings : [];
             const localOnlyBookings = safeCurrentBookings.filter(local => 
-              !transformedBookings.find(db => db.supabaseId === local.supabaseId)
+              // Garder seulement les réservations locales qui n'ont pas d'équivalent en BD
+              !local.syncedWithDB && // Pas encore synchronisées
+              !transformedBookings.find(db => 
+                db.trip_id === local.trip_id && 
+                db.seatNumber === local.seatNumber &&
+                Math.abs(new Date(db.bookingDate) - new Date(local.bookingDate)) < 60000 // Même minute
+              )
             );
+            
+            console.log(`📋 Déduplication: ${transformedBookings.length} Supabase + ${localOnlyBookings.length} locales non sync = ${transformedBookings.length + localOnlyBookings.length} total`);
             
             const allBookings = [...transformedBookings, ...localOnlyBookings];
             
