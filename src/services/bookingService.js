@@ -371,17 +371,7 @@ export const bookingService = {
     try {
       const { data, error } = await supabase
         .from('bookings')
-        .select(`
-          *,
-          trips!inner (
-            ville_depart,
-            ville_arrivee,
-            date,
-            heure_dep,
-            heure_arr,
-            agencies (nom)
-          )
-        `)
+        .select('*')
         .eq('id', bookingId)
         .single()
 
@@ -420,8 +410,6 @@ export const bookingService = {
         .from('bookings')
         .update({
           booking_status: 'cancelled',
-          cancellation_reason: reason,
-          cancelled_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', bookingId)

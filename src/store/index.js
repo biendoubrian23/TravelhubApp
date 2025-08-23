@@ -420,7 +420,34 @@ export const useBookingsStore = create(devtools((set, get) => ({
     bookings: state.bookings.map(booking =>
       booking.id === bookingId ? { ...booking, status } : booking
     )
-  }))
+  })),
+
+  cancelBooking: async (bookingId) => {
+    try {
+      console.log('🗑️ Annulation de la réservation:', bookingId);
+      
+      // Importer le service
+      const { bookingService } = await import('../services/bookingService');
+      
+      // Annuler dans la base de données
+      await bookingService.cancelBooking(bookingId);
+      console.log('✅ Réservation annulée en BD');
+      
+      // Mettre à jour le store local
+      set(state => ({
+        bookings: state.bookings.map(booking =>
+          booking.id === bookingId || booking.supabaseId === bookingId
+            ? { ...booking, status: 'cancelled', booking_status: 'cancelled' }
+            : booking
+        )
+      }));
+      
+      console.log('✅ Store local mis à jour');
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'annulation:', error);
+      throw error;
+    }
+  }
 }), {
   name: 'bookings-store'
 }))

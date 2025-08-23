@@ -122,6 +122,12 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
                          reference.toLowerCase().includes(searchQuery.toLowerCase());
     
     if (filter === 'all') return matchesSearch;
+    
+    // Les réservations annulées vont dans "Terminés"
+    if (filter === 'completed') {
+      return matchesSearch && (booking.booking_status === 'completed' || booking.booking_status === 'cancelled');
+    }
+    
     return matchesSearch && booking.booking_status === filter;
   });
   

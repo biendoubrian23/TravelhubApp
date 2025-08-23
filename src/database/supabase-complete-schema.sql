@@ -335,16 +335,16 @@ BEGIN
             END LOOP;
             
         ELSE
-            -- Bus classique: 40 sièges (2+3 configuration, 8 rangées)
-            FOR row_num IN 1..8 LOOP
-                FOR col_num IN 1..5 LOOP
-                    seat_num := row_num || CASE col_num WHEN 1 THEN 'A' WHEN 2 THEN 'B' WHEN 3 THEN 'C' WHEN 4 THEN 'D' WHEN 5 THEN 'E' END;
-                    seat_type_val := 'standard';
-                    price_mod := 0;
-                    
-                    INSERT INTO public.seat_maps (trip_id, seat_number, seat_type, is_available, price_modifier_fcfa, position_row, position_column)
-                    VALUES (trip_record.id, seat_num, seat_type_val, true, price_mod, row_num, col_num);
-                END LOOP;
+            -- Bus classique: 40 sièges (numérotation simple 1-40)
+            FOR seat_number IN 1..40 LOOP
+                row_num := ((seat_number - 1) / 5) + 1;  -- 5 sièges par rangée
+                col_num := ((seat_number - 1) % 5) + 1;  -- Position dans la rangée
+                seat_num := seat_number::TEXT;           -- Numérotation simple: 1, 2, 3, etc.
+                seat_type_val := 'standard';
+                price_mod := 0;
+                
+                INSERT INTO public.seat_maps (trip_id, seat_number, seat_type, is_available, price_modifier_fcfa, position_row, position_column)
+                VALUES (trip_record.id, seat_num, seat_type_val, true, price_mod, row_num, col_num);
             END LOOP;
         END IF;
     END LOOP;

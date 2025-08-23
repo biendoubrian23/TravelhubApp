@@ -51,14 +51,15 @@ const BookingDetailsScreen = ({ route, navigation }) => {
 
   // S'assurer que toutes les propriétés existent avec des valeurs par défaut
   const safeBooking = {
-    departure: booking.departure || 'Ville inconnue',
-    arrival: booking.arrival || 'Ville inconnue',
+    departure: booking.departure || booking.trip?.departure_city || 'Ville inconnue',
+    arrival: booking.arrival || booking.trip?.arrival_city || 'Ville inconnue',
     date: booking.date || 'Date inconnue',
-    time: booking.time || '00:00',
+    time: booking.time || booking.trip?.heure_dep || '00:00',
+    arrivalTime: booking.trip?.heure_arr || '00:00', // Ajouter l'heure d'arrivée
     id: booking.id || 'N/A',
     seatNumber: booking.seatNumber || 'N/A',
     busType: booking.busType || 'Standard',
-    agency: booking.agency || 'TravelHub',
+    agency: booking.trip?.agencies?.nom || booking.agency || 'TravelHub', // Utiliser la vraie agence
     price: booking.price || 0,
     status: booking.status || 'unknown',
     passengerName: booking.passengerName || 'Nom non défini',
@@ -160,7 +161,8 @@ Bon voyage ! 🚌✨`,
     });
   };
 
-  const canCancel = safeBooking.status === 'upcoming' || safeBooking.status === 'confirmed';
+  const canCancel = (safeBooking.status === 'upcoming' || safeBooking.status === 'confirmed') && 
+                    (safeBooking.booking_status !== 'cancelled');
 
   return (
     <SafeAreaView style={styles.container}>
@@ -216,7 +218,7 @@ Bon voyage ! 🚌✨`,
             <View style={styles.cityContainer}>
               <Text style={styles.cityName}>{safeBooking.arrival}</Text>
               <Text style={styles.cityTime}>
-                {safeBooking.duration}
+                {safeBooking.arrivalTime}
               </Text>
             </View>
           </View>
@@ -235,7 +237,7 @@ Bon voyage ! 🚌✨`,
             <DetailItem
               icon="receipt"
               label="Référence"
-              value={safeBooking.id}
+              value={booking.bookingReference || booking.booking_reference || `TH${safeBooking.id?.slice(-6).toUpperCase()}`}
             />
             <DetailItem
               icon="person"
