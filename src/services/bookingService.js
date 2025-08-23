@@ -12,6 +12,22 @@ export const bookingService = {
         throw new Error('tripId et userId sont obligatoires');
       }
 
+      // 🛡️ Vérifier s'il existe déjà une réservation pour ce voyage et cet utilisateur
+      console.log('Vérification des doublons pour trip:', bookingData.tripId, 'user:', bookingData.userId);
+      const { data: existingBookings, error: checkError } = await supabase
+        .from('bookings')
+        .select('id, booking_reference')
+        .eq('trip_id', bookingData.tripId)
+        .eq('user_id', bookingData.userId)
+        .eq('booking_status', 'confirmed');
+
+      if (checkError) {
+        console.warn('⚠️ Erreur lors de la vérification des doublons:', checkError);
+      } else if (existingBookings && existingBookings.length > 0) {
+        console.log('🛑 Réservation existante trouvée, pas de duplication:', existingBookings[0]);
+        return existingBookings[0]; // Retourner la réservation existante
+      }
+
       // 🆕 Récupérer les vraies informations de l'utilisateur depuis la table users
       console.log('Récupération des informations utilisateur...');
       

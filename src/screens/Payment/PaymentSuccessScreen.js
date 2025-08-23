@@ -19,8 +19,19 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
   const { addBooking } = useBookingsStore();
   const { user } = useAuthStore();
   
-  // État pour éviter la création multiple de réservations
-  const [bookingCreated, setBookingCreated] = useState(false);
+  // État pour éviter la création multiple de réservations avec une clé unique
+  const tripId = trip?.id;
+  const userId = user?.id;
+  const bookingKey = `${tripId}_${userId}`;
+  
+  // Utiliser une Map globale pour éviter les doublons entre différentes instances
+  if (!global.processedBookings) {
+    global.processedBookings = new Map();
+  }
+  
+  const [bookingCreated, setBookingCreated] = useState(
+    global.processedBookings.has(bookingKey)
+  );
 
   // Animations
   const [checkAnimation] = useState(new Animated.Value(0));
@@ -51,13 +62,16 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
 
     const addBookingToHistory = async () => {
       // Vérifier si la réservation a déjà été créée pour éviter les doublons
-      if (bookingCreated) {
-        console.log('🛑 Réservation déjà créée, pas de duplication');
+      if (bookingCreated || global.processedBookings.has(bookingKey)) {
+        console.log('🛑 Réservation déjà créée, pas de duplication pour:', bookingKey);
         return;
       }
 
-      setBookingCreated(true); // Marquer comme créé immédiatement
-      console.log('🚀 Création de la réservation après confirmation de paiement...');
+      // Marquer comme en cours de traitement immédiatement
+      setBookingCreated(true);
+      global.processedBookings.set(bookingKey, Date.now());
+      
+      console.log('🚀 Création de la réservation après confirmation de paiement pour:', bookingKey);
 
       // Ajouter la réservation à l'historique et à Supabase
       const currentDate = new Date();
@@ -103,7 +117,9 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
         console.log('📋 Nouvelle réservation:', JSON.stringify(newBooking, null, 2));
       } catch (error) {
         console.error('❌ Erreur lors de l\'ajout de la réservation:', error);
-        setBookingCreated(false); // Réinitialiser en cas d'erreur pour permettre un nouvel essai
+        // En cas d'erreur, permettre un nouvel essai
+        setBookingCreated(false);
+        global.processedBookings.delete(bookingKey);
       }
     };
 

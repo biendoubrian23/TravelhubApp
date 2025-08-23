@@ -227,6 +227,27 @@ export const useBookingsStore = create(devtools((set, get) => ({
   isLoading: false,
 
   addBooking: async (booking, user) => {
+    // Protection contre les doublons basée sur tripId et userId
+    const tripId = booking.trip?.id || booking.tripId || booking.trip_id;
+    if (!tripId) {
+      console.error('❌ Aucun trip_id trouvé dans:', booking);
+      throw new Error('trip_id manquant pour la sauvegarde');
+    }
+
+    // Vérifier s'il y a déjà une réservation pour ce voyage et cet utilisateur
+    const { bookings } = get();
+    const existingBooking = bookings.find(b => 
+      (b.trip?.id === tripId || b.tripId === tripId || b.trip_id === tripId) && 
+      (b.userId === user?.id || b.user_id === user?.id)
+    );
+
+    if (existingBooking) {
+      console.log('🛑 Réservation existante trouvée, pas de duplication:', existingBooking);
+      return existingBooking;
+    }
+
+    console.log('🚀 Création nouvelle réservation pour trip:', tripId, 'user:', user?.id);
+
     const newBooking = {
       ...booking,
       id: `BK${Date.now()}`,
@@ -244,19 +265,12 @@ export const useBookingsStore = create(devtools((set, get) => ({
     // Sauvegarde Supabase ACTIVE
     if (user?.id) {
       try {
-        // Mapping et validation des données pour Supabase
-        const tripId = booking.trip?.id || booking.trip_id;
-        if (!tripId) {
-          console.error('❌ Aucun trip_id trouvé dans:', booking);
-          throw new Error('trip_id manquant pour la sauvegarde Supabase');
-        }
-
         const bookingData = {
           tripId: tripId,
           userId: user.id,
           seatNumber: booking.seatNumber,
           // Ne plus passer les infos génériques - le service les récupérera depuis la table users
-          totalPrice: booking.price || 0,
+          totalPrice: booking.price || booking.totalPrice || 0,
           paymentMethod: booking.paymentMethod || 'mobile_money',
           selectedSeats: booking.selectedSeats // Pour les sièges VIP
         }
@@ -269,7 +283,7 @@ export const useBookingsStore = create(devtools((set, get) => ({
           
           // Supprimer la réservation locale temporaire et la remplacer par les données BD
           set((state) => {
-            const filteredBookings = state.bookings.filter(b => b.id !== booking.id);
+            const filteredBookings = state.bookings.filter(b => b.id !== newBooking.id);
             console.log('🧹 Suppression réservation locale temporaire, reste:', filteredBookings.length);
             return { bookings: filteredBookings };
           })
