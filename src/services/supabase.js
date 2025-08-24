@@ -13,6 +13,7 @@ export const authService = {
           data: {
             full_name: userData.full_name || `${userData.prenom || ''} ${userData.nom || ''}`.trim(),
             phone: userData.telephone || userData.phone || '',
+            ville: userData.ville || null, // Ajouter la ville dans les métadonnées Auth
             role: 'client' // Toujours client
           }
         }

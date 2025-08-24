@@ -257,6 +257,13 @@ const ProfileScreen = ({ navigation }) => {
           />
           
           <MenuItem
+            icon="person"
+            title="👤 Test Données Utilisateur"
+            subtitle="Diagnostique des données utilisateur"
+            onPress={() => navigation.navigate('UserDataTest')}
+          />
+          
+          <MenuItem
             icon="download"
             title="Données hors ligne"
             subtitle="Gérer le cache et téléchargements"

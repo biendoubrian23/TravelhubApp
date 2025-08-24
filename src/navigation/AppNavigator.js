@@ -25,6 +25,7 @@ import PaymentScreen from '../screens/Payment/PaymentScreen';
 import PaymentSuccessScreen from '../screens/Payment/PaymentSuccessScreen';
 import ReservationTestScreen from '../screens/ReservationTestScreen';
 import DatabaseTestScreen from '../screens/DatabaseTestScreen';
+import UserDataTestScreen from '../screens/UserDataTestScreen';
 
 // New Auth Screens
 import SplashScreen from '../screens/Auth/SplashScreen';
@@ -307,6 +308,16 @@ const AppNavigator = () => {
               component={ReservationTestScreen}
               options={{
                 title: '🧪 Test Réservations',
+                presentation: 'card',
+                animationTypeForReplace: 'push',
+              }}
+            />
+
+            <Stack.Screen 
+              name="UserDataTest" 
+              component={UserDataTestScreen}
+              options={{
+                title: '👤 Test Données Utilisateur',
                 presentation: 'card',
                 animationTypeForReplace: 'push',
               }}

@@ -16,7 +16,7 @@ export const bookingService = {
       const { authService } = await import('./supabase');
       await authService.ensureUserProfile(bookingData.userId);
       
-      const { data: userData, error: userError } = await supabase
+      let { data: userData, error: userError } = await supabase
         .from('users')
         .select('full_name, phone, ville, email')
         .eq('id', bookingData.userId)
@@ -24,6 +24,7 @@ export const bookingService = {
 
       if (userError) {
         console.warn('⚠️ Impossible de récupérer les infos utilisateur:', userError);
+        // Fallback sur les données Supabase Auth
         const { data: { user } } = await supabase.auth.getUser();
         userData = {
           full_name: user?.user_metadata?.full_name || user?.full_name || 'Client TravelHub',
@@ -31,6 +32,18 @@ export const bookingService = {
           ville: user?.user_metadata?.ville || null,
           email: user?.email
         };
+      } else {
+        // Même si la requête réussit, vérifier si les données critiques sont présentes
+        // Si phone ou ville manquent, utiliser les métadonnées Auth
+        if (!userData.phone || !userData.ville) {
+          console.log('⚠️ Données manquantes dans la table users, utilisation des métadonnées Auth');
+          const { data: { user } } = await supabase.auth.getUser();
+          userData = {
+            ...userData,
+            phone: userData.phone || user?.user_metadata?.phone || user?.phone || bookingData.passengerPhone || '+237600000000',
+            ville: userData.ville || user?.user_metadata?.ville || null,
+          };
+        }
       }
 
       console.log('👤 Informations utilisateur récupérées:', userData);
@@ -169,7 +182,7 @@ export const bookingService = {
       const { authService } = await import('./supabase');
       await authService.ensureUserProfile(bookingData.userId);
       
-      const { data: userData, error: userError } = await supabase
+      let { data: userData, error: userError } = await supabase
         .from('users')
         .select('full_name, phone, ville, email')
         .eq('id', bookingData.userId)
@@ -185,6 +198,18 @@ export const bookingService = {
           ville: user?.user_metadata?.ville || null,
           email: user?.email
         };
+      } else {
+        // Même si la requête réussit, vérifier si les données critiques sont présentes
+        // Si phone ou ville manquent, utiliser les métadonnées Auth
+        if (!userData.phone || !userData.ville) {
+          console.log('⚠️ Données manquantes dans la table users, utilisation des métadonnées Auth');
+          const { data: { user } } = await supabase.auth.getUser();
+          userData = {
+            ...userData,
+            phone: userData.phone || user?.user_metadata?.phone || user?.phone || bookingData.passengerPhone || '+237600000000',
+            ville: userData.ville || user?.user_metadata?.ville || null,
+          };
+        }
       }
 
       console.log('👤 Informations utilisateur récupérées:', userData);
