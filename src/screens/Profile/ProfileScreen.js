@@ -19,24 +19,118 @@ const ProfileScreen = ({ navigation }) => {
   const { user, signOut, updateProfile } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [userStats, setUserStats] = useState({
-    totalTrips: 0,
-    totalDistance: 0,
-    favoriteDestination: '',
+    totalBookings: 0,        // Nombre de réservations
+    referralsCount: 2,       // Nombre de parrainés (fixe pour le moment)
+    userCity: 'Douala',      // Ville de l'utilisateur
     memberSince: '',
+  });
+  const [userProfile, setUserProfile] = useState({
+    fullName: '',
+    email: '',
   });
 
   useEffect(() => {
     loadUserStats();
-  }, []);
+  }, [user]); // Recharger quand l'utilisateur change
 
   const loadUserStats = async () => {
-    // TODO: Charger les statistiques depuis l'API
-    setUserStats({
-      totalTrips: 12,
-      totalDistance: 2450, // km
-      favoriteDestination: 'Douala',
-      memberSince: user?.created_at ? new Date(user.created_at).getFullYear().toString() : '2025',
-    });
+    try {
+      let totalBookings = 0;
+      let userCity = 'Douala'; // Valeur par défaut
+      let fullName = '';
+      
+      if (user?.id) {
+        // 1. Charger le nombre de réservations depuis la base de données
+        const { supabase } = await import('../../services/supabaseClient');
+        const { data: bookings, error: bookingsError } = await supabase
+          .from('bookings')
+          .select('id')
+          .eq('user_id', user.id);
+          
+        if (!bookingsError && bookings) {
+          totalBookings = bookings.length;
+          console.log(`📊 Utilisateur a ${totalBookings} réservations`);
+        }
+        
+        // 2. Récupérer les informations utilisateur (nom et ville)
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('full_name, ville')
+          .eq('id', user.id)
+          .single();
+          
+        if (!userError && userData) {
+          // Récupérer le nom complet
+          if (userData.full_name) {
+            fullName = userData.full_name;
+            console.log(`👤 Nom depuis table users: ${fullName}`);
+          }
+          
+          // Récupérer la ville
+          if (userData.ville) {
+            userCity = userData.ville;
+            console.log(`🏙️ Ville depuis table users: ${userCity}`);
+          }
+        }
+        
+        // 3. Fallbacks si les données ne sont pas dans la table users
+        if (!fullName) {
+          // Essayer depuis les métadonnées Auth
+          if (user.user_metadata?.full_name) {
+            fullName = user.user_metadata.full_name;
+            console.log(`👤 Nom depuis métadonnées Auth: ${fullName}`);
+          } else if (user.user_metadata?.firstName && user.user_metadata?.lastName) {
+            fullName = `${user.user_metadata.firstName} ${user.user_metadata.lastName}`;
+            console.log(`👤 Nom construit depuis firstName/lastName: ${fullName}`);
+          } else {
+            // Utiliser la partie avant @ de l'email comme nom par défaut
+            fullName = user?.email?.split('@')[0] || 'Utilisateur';
+            console.log(`👤 Nom par défaut depuis email: ${fullName}`);
+          }
+        }
+        
+        if (!userData?.ville) {
+          // Fallback : essayer depuis les métadonnées Auth pour la ville
+          if (user.user_metadata?.ville) {
+            userCity = user.user_metadata.ville;
+            console.log(`🏙️ Ville depuis métadonnées Auth: ${userCity}`);
+          } else {
+            console.log(`🏙️ Aucune ville trouvée, utilisation de la valeur par défaut: ${userCity}`);
+          }
+        }
+      }
+      
+      // Mettre à jour les états
+      setUserProfile({
+        fullName,
+        email: user?.email || '',
+      });
+      
+      setUserStats({
+        totalBookings,
+        referralsCount: 2, // Fixe pour le moment, sera dynamique avec le système de parrainage
+        userCity,
+        memberSince: user?.created_at ? new Date(user.created_at).getFullYear().toString() : '2025',
+      });
+    } catch (error) {
+      console.error('Erreur lors du chargement des statistiques utilisateur:', error);
+      // Valeurs par défaut en cas d'erreur
+      setUserProfile({
+        fullName: user?.email?.split('@')[0] || 'Utilisateur',
+        email: user?.email || '',
+      });
+      setUserStats({
+        totalBookings: 0,
+        referralsCount: 2,
+        userCity: 'Douala',
+        memberSince: '2025',
+      });
+    }
+  };
+
+  // Fonction pour recharger les statistiques (utile après une nouvelle réservation)
+  const refreshUserStats = () => {
+    loadUserStats();
   };
 
   const handleSignOut = () => {
@@ -58,11 +152,26 @@ const ProfileScreen = ({ navigation }) => {
     );
   };
 
-  const shareApp = async () => {
+  const referFriend = async () => {
     try {
+      const referralMessage = `🎉 Rejoignez-moi sur TravelHub ! 
+      
+Voyagez facilement au Cameroun avec l'app de transport la plus fiable. 
+
+✅ Réservation en ligne
+✅ Choix de siège
+✅ Paiement sécurisé
+✅ Support 24/7
+
+Téléchargez TravelHub dès maintenant et profitez de voyages confortables !
+
+👉 https://travelhub.cm/app
+
+Partagé par ${userProfile.fullName || 'un ami'} 😊`;
+      
       await Share.share({
-        message: 'Découvrez TravelHub, l\'app qui révolutionne le transport au Cameroun ! 🚌✨ Téléchargez-la maintenant.',
-        url: 'https://travelhub.cm/download',
+        message: referralMessage,
+        title: 'Découvrez TravelHub - Transport au Cameroun',
       });
     } catch (error) {
       console.error('Erreur lors du partage:', error);
@@ -137,12 +246,9 @@ const ProfileScreen = ({ navigation }) => {
           
           <View style={styles.userInfo}>
             <Text style={styles.userName}>
-              {user?.user_metadata?.firstName && user?.user_metadata?.lastName 
-                ? `${user.user_metadata.firstName} ${user.user_metadata.lastName}`
-                : user?.email?.split('@')[0] || 'Utilisateur'
-              }
+              {userProfile.fullName || 'Utilisateur'}
             </Text>
-            <Text style={styles.userEmail}>{user?.email}</Text>
+            <Text style={styles.userEmail}>{userProfile.email}</Text>
             <Text style={styles.memberSince}>Membre depuis {userStats.memberSince}</Text>
           </View>
         </View>
@@ -150,18 +256,18 @@ const ProfileScreen = ({ navigation }) => {
         {/* Statistiques */}
         <View style={styles.statsContainer}>
           <StatItem 
-            label="Voyages" 
-            value={userStats.totalTrips} 
-            icon="bus" 
+            label="Réservations" 
+            value={userStats.totalBookings} 
+            icon="calendar" 
           />
           <StatItem 
-            label="Kilomètres" 
-            value={`${userStats.totalDistance}km`} 
-            icon="speedometer" 
+            label="Parrainés" 
+            value={userStats.referralsCount} 
+            icon="people" 
           />
           <StatItem 
-            label="Destination favorite" 
-            value={userStats.favoriteDestination} 
+            label="Ville" 
+            value={userStats.userCity} 
             icon="location" 
           />
         </View>
@@ -171,10 +277,11 @@ const ProfileScreen = ({ navigation }) => {
         {/* Compte */}
         <MenuSection title="Mon compte">
           <MenuItem
-            icon="person"
-            title="Modifier le profil"
-            subtitle="Informations personnelles, photo, contacts"
-            onPress={() => navigation.navigate('EditProfile')}
+            icon="people"
+            title="Parrainer des amis"
+            subtitle="Invitez vos proches et gagnez des avantages"
+            onPress={referFriend}
+            color={COLORS.primary}
           />
           
           <MenuItem
@@ -194,37 +301,6 @@ const ProfileScreen = ({ navigation }) => {
 
         {/* Voyage */}
         <MenuSection title="Mes voyages">
-          <MenuItem
-            icon="time"
-            title="Historique des voyages"
-            subtitle="Consultez vos trajets passés"
-            onPress={() => navigation.navigate('TripHistory')}
-          />
-          
-          <MenuItem
-            icon="heart"
-            title="Trajets favoris"
-            subtitle="Vos destinations préférées"
-            onPress={() => {
-              // Navigation vers l'onglet Favorites dans ClientMain
-              navigation.reset({
-                index: 0,
-                routes: [{ 
-                  name: 'ClientMain',
-                  state: {
-                    index: 2, // Index 2 correspond à l'onglet "Favorites"
-                    routes: [
-                      { name: 'Home' },
-                      { name: 'Bookings' },
-                      { name: 'Favorites' },
-                      { name: 'Profile' }
-                    ]
-                  }
-                }],
-              });
-            }}
-          />
-          
           <MenuItem
             icon="receipt"
             title="Factures et reçus"
@@ -261,13 +337,6 @@ const ProfileScreen = ({ navigation }) => {
             title="👤 Test Données Utilisateur"
             subtitle="Diagnostique des données utilisateur"
             onPress={() => navigation.navigate('UserDataTest')}
-          />
-          
-          <MenuItem
-            icon="download"
-            title="Données hors ligne"
-            subtitle="Gérer le cache et téléchargements"
-            onPress={() => Alert.alert('Bientôt disponible', 'Cette fonctionnalité sera disponible prochainement')}
           />
         </MenuSection>
 
@@ -320,14 +389,6 @@ const ProfileScreen = ({ navigation }) => {
             subtitle="Votre avis compte pour nous"
             onPress={() => Linking.openURL('https://play.google.com/store/apps/details?id=com.travelhub.app')}
             color={COLORS.warning}
-          />
-          
-          <MenuItem
-            icon="share"
-            title="Partager l'application"
-            subtitle="Recommandez TravelHub à vos proches"
-            onPress={shareApp}
-            color={COLORS.primary}
           />
           
           <MenuItem
