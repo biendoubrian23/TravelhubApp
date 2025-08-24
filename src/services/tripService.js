@@ -417,5 +417,80 @@ export const tripService = {
     } catch (error) {
       console.error('Erreur dans unsubscribe:', error)
     }
+  },
+
+  // Récupérer les prix minimum pour plusieurs dates en une seule fois
+  async getMinimumPricesForDates(departure, arrival, dates) {
+    try {
+      console.log(`Récupération des prix minimum pour ${dates.length} dates:`, dates.map(d => d.toDateString()))
+      
+      // Faire tous les appels en parallèle
+      const pricePromises = dates.map(date => 
+        this.getMinimumPriceForDate(departure, arrival, date)
+      )
+      
+      const prices = await Promise.all(pricePromises)
+      
+      // Créer un objet associant chaque date à son prix minimum
+      const datesPrices = dates.map((date, index) => ({
+        date,
+        price: prices[index]
+      }))
+      
+      console.log('Prix minimum récupérés:', datesPrices.map(dp => `${dp.date.toDateString()}: ${dp.price || 'N/A'}`))
+      return datesPrices
+    } catch (error) {
+      console.error('Erreur dans getMinimumPricesForDates:', error)
+      return dates.map(date => ({ date, price: null }))
+    }
+  },
+
+  // Récupérer le prix minimum pour une date et un trajet donné
+  async getMinimumPriceForDate(departure, arrival, date) {
+    try {
+      // Validation et création de la date de recherche
+      let searchDate
+      if (typeof date === 'string') {
+        searchDate = new Date(date)
+      } else if (date instanceof Date) {
+        searchDate = new Date(date)
+      } else {
+        searchDate = new Date()
+      }
+      
+      // Vérifier si la date est valide
+      if (isNaN(searchDate.getTime())) {
+        console.warn('Date invalide pour getMinimumPriceForDate, utilisation de la date actuelle')
+        return null
+      }
+      
+      const startOfDay = new Date(searchDate)
+      startOfDay.setHours(0, 0, 0, 0)
+      
+      const endOfDay = new Date(searchDate)
+      endOfDay.setHours(23, 59, 59, 999)
+
+      const { data: trips, error } = await supabase
+        .from('trips')
+        .select('price_fcfa')
+        .eq('departure_city', departure)
+        .eq('arrival_city', arrival)
+        .gte('departure_time', startOfDay.toISOString())
+        .lte('departure_time', endOfDay.toISOString())
+        .eq('is_active', true)
+        .order('price_fcfa', { ascending: true })
+        .limit(1)
+
+      if (error) {
+        console.error('Erreur lors de la recherche du prix minimum:', error)
+        return null
+      }
+
+      // Retourner le prix minimum ou null si aucun trajet trouvé
+      return trips && trips.length > 0 ? trips[0].price_fcfa : null
+    } catch (error) {
+      console.error('Erreur dans getMinimumPriceForDate:', error)
+      return null
+    }
   }
 }

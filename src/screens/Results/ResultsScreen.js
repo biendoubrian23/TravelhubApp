@@ -38,6 +38,7 @@ const ResultsScreen = ({ navigation, route }) => {
   const [selectedFilter, setSelectedFilter] = useState('all')
   const [dateCarousel, setDateCarousel] = useState([])
   const [isLoadingNewDate, setIsLoadingNewDate] = useState(false)
+  const [isLoadingCarousel, setIsLoadingCarousel] = useState(false)
   const [localSearchParams, setLocalSearchParams] = useState(searchParams)
   const [showingReturnTrips, setShowingReturnTrips] = useState(false)
   const [outboundSeats, setOutboundSeats] = useState([]) // Pour stocker les sièges aller sélectionnés
@@ -98,58 +99,80 @@ const ResultsScreen = ({ navigation, route }) => {
     setLocalSearchParams(searchParams)
   }, [searchParams.departure, searchParams.arrival, searchParams.passengers])
 
-  const generateDateCarousel = () => {
-    const dates = []
-    // Utiliser la date de retour si on affiche les trajets retour, sinon la date de départ
-    const selectedDate = showingReturnTrips ? searchParams.returnDate : searchParams.date
-    
-    // Si aucune date n'est sélectionnée, utiliser aujourd'hui par défaut
-    if (!selectedDate) {
-      console.warn('generateDateCarousel - Aucune date sélectionnée, utilisation de la date du jour')
-      const today = new Date()
-      const baseDate = today
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(baseDate)
-        date.setDate(baseDate.getDate() + i)
-        dates.push({
-          date,
-          price: Math.floor(Math.random() * 2000) + 2500
-        })
-      }
-      setDateCarousel(dates)
-      return
-    }
-    
-    const baseDate = new Date(selectedDate)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0) // Reset time to compare only dates
-    
-    for (let i = -3; i <= 3; i++) {
-      const date = new Date(baseDate)
-      date.setDate(baseDate.getDate() + i)
+  const generateDateCarousel = async () => {
+    setIsLoadingCarousel(true)
+    try {
+      const dates = []
+      // Utiliser la date de retour si on affiche les trajets retour, sinon la date de départ
+      const selectedDate = showingReturnTrips ? searchParams.returnDate : searchParams.date
       
-      // Ne pas inclure les dates passées
-      if (date >= today) {
-        dates.push({
-          date,
-          price: Math.floor(Math.random() * 2000) + 2500 // Prix simulé
-        })
+      // Si aucune date n'est sélectionnée, utiliser aujourd'hui par défaut
+      if (!selectedDate) {
+        console.warn('generateDateCarousel - Aucune date sélectionnée, utilisation de la date du jour')
+        const today = new Date()
+        for (let i = 0; i < 7; i++) {
+          const date = new Date(today)
+          date.setDate(today.getDate() + i)
+          dates.push(date)
+        }
+      } else {
+        const baseDate = new Date(selectedDate)
+        const today = new Date()
+        today.setHours(0, 0, 0, 0) // Reset time to compare only dates
+        
+        for (let i = -3; i <= 3; i++) {
+          const date = new Date(baseDate)
+          date.setDate(baseDate.getDate() + i)
+          
+          // Ne pas inclure les dates passées
+          if (date >= today) {
+            dates.push(date)
+          }
+        }
+        
+        // Si aucune date future n'est disponible, générer les 7 prochains jours
+        if (dates.length === 0) {
+          for (let i = 0; i < 7; i++) {
+            const date = new Date(today)
+            date.setDate(today.getDate() + i)
+            dates.push(date)
+          }
+        }
       }
-    }
-    
-    // Si aucune date future n'est disponible, générer les 7 prochains jours
-    if (dates.length === 0) {
+      
+      // Récupérer tous les prix minimum en parallèle
+      const datesPrices = await tripService.getMinimumPricesForDates(
+        searchParams.departure,
+        searchParams.arrival,
+        dates
+      )
+      
+      // Formater les données pour le carrousel avec fallback
+      const carouselData = datesPrices.map(({ date, price }) => ({
+        date,
+        price: price, // Garder null si aucun prix trouvé
+        hasTrips: price !== null // Indiquer s'il y a des trajets pour cette date
+      }))
+      
+      setDateCarousel(carouselData)
+    } catch (error) {
+      console.error('Erreur lors de la génération du carrousel de dates:', error)
+      // En cas d'erreur, générer des dates sans prix
+      const dates = []
+      const today = new Date()
       for (let i = 0; i < 7; i++) {
         const date = new Date(today)
         date.setDate(today.getDate() + i)
         dates.push({
           date,
-          price: Math.floor(Math.random() * 2000) + 2500 // Prix simulé
+          price: null,
+          hasTrips: false
         })
       }
+      setDateCarousel(dates)
+    } finally {
+      setIsLoadingCarousel(false)
     }
-    
-    setDateCarousel(dates)
   }
 
   const searchTrips = async () => {
@@ -383,9 +406,9 @@ const ResultsScreen = ({ navigation, route }) => {
           isSelected && styles.selectedDateItem,
           isLoadingNewDate && !isSelected && styles.disabledDateItem
         ]}
-        onPress={() => handleDateSelect(item.date)}
-        disabled={isLoadingNewDate}
-        activeOpacity={0.7}
+        onPress={() => item.hasTrips && handleDateSelect(item.date)} // Désactiver si pas de trajets
+        disabled={isLoadingNewDate || !item.hasTrips} // Désactiver si pas de trajets
+        activeOpacity={item.hasTrips ? 0.7 : 1}
       >
         {isSelected && isLoadingNewDate ? (
           <ActivityIndicator size="small" color={COLORS.surface} />
@@ -398,7 +421,7 @@ const ResultsScreen = ({ navigation, route }) => {
               {formatDate(item.date).split(' ').slice(1).join(' ')}
             </Text>
             <Text style={[styles.datePrice, isSelected && styles.selectedDateText]}>
-              dès {formatPrice(item.price)}
+              {item.price ? `dès ${formatPrice(item.price)}` : 'Aucun trajet'}
             </Text>
           </>
         )}
@@ -472,14 +495,21 @@ const ResultsScreen = ({ navigation, route }) => {
 
       {/* Date Carousel */}
       <View style={styles.dateCarouselContainer}>
-        <FlatList
-          data={dateCarousel}
-          renderItem={renderDateCarouselItem}
-          keyExtractor={(item, index) => index.toString()}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.dateCarousel}
-        />
+        {isLoadingCarousel ? (
+          <View style={styles.carouselLoading}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+            <Text style={styles.carouselLoadingText}>Chargement des prix...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={dateCarousel}
+            renderItem={renderDateCarouselItem}
+            keyExtractor={(item, index) => index.toString()}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.dateCarousel}
+          />
+        )}
       </View>
 
       {/* Filters */}
@@ -598,6 +628,19 @@ const styles = StyleSheet.create({
 
   dateCarouselContainer: {
     paddingVertical: SPACING.sm,
+  },
+
+  carouselLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+  },
+
+  carouselLoadingText: {
+    marginLeft: SPACING.xs,
+    fontSize: 14,
+    color: COLORS.text.secondary,
   },
 
   dateCarousel: {
