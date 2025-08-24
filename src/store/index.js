@@ -276,10 +276,12 @@ export const useBookingsStore = create(devtools((set, get) => ({
         }
         
         console.log('💾 Sauvegarde réservation en BD avec données mappées:', bookingData)
-        const data = await bookingService.createBooking(bookingData)
         
-        if (data) {
-          console.log('✅ Réservation sauvegardée dans Supabase:', data)
+        // Utiliser createMultipleBookings pour créer une réservation par siège
+        const data = await bookingService.createMultipleBookings(bookingData)
+        
+        if (data && Array.isArray(data) && data.length > 0) {
+          console.log(`✅ ${data.length} réservations sauvegardées dans Supabase:`, data)
           
           // Supprimer la réservation locale temporaire et la remplacer par les données BD
           set((state) => {

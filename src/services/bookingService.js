@@ -1,7 +1,140 @@
 import { supabase } from './supabaseClient'
 
 export const bookingService = {
-  // Créer une nouvelle réservation
+  // Créer plusieurs réservations (une par siège)
+  async createMultipleBookings(bookingData) {
+    try {
+      console.log('=== DÉBUT CRÉATION RÉSERVATIONS MULTIPLES ===');
+      console.log('Données reçues:', bookingData);
+      
+      // Validation des données essentielles
+      if (!bookingData.tripId || !bookingData.userId) {
+        throw new Error('tripId et userId sont obligatoires');
+      }
+
+      // Récupérer les vraies informations de l'utilisateur
+      const { authService } = await import('./supabase');
+      await authService.ensureUserProfile(bookingData.userId);
+      
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('full_name, phone, ville, email')
+        .eq('id', bookingData.userId)
+        .single();
+
+      if (userError) {
+        console.warn('⚠️ Impossible de récupérer les infos utilisateur:', userError);
+        const { data: { user } } = await supabase.auth.getUser();
+        userData = {
+          full_name: user?.user_metadata?.full_name || user?.full_name || 'Client TravelHub',
+          phone: user?.user_metadata?.phone || user?.phone || bookingData.passengerPhone || '+237600000000',
+          ville: user?.user_metadata?.ville || null,
+          email: user?.email
+        };
+      }
+
+      console.log('👤 Informations utilisateur récupérées:', userData);
+      
+      let finalSeatNumbers = [];
+      
+      // Gérer l'attribution des sièges
+      if (bookingData.selectedSeats && Array.isArray(bookingData.selectedSeats)) {
+        finalSeatNumbers = bookingData.selectedSeats.map(seat => 
+          typeof seat === 'object' ? seat.seat_number || seat.number : seat
+        );
+      } else if (bookingData.seatNumber) {
+        finalSeatNumbers = [bookingData.seatNumber];
+      } else {
+        // Attribution automatique pour trajets non-VIP
+        const { busService } = await import('./busService');
+        const numberOfSeats = bookingData.passengers || 1;
+        const assignedSeats = await busService.autoReserveSeats(bookingData.tripId, numberOfSeats);
+        finalSeatNumbers = assignedSeats.map(seat => seat.seat_number);
+      }
+
+      console.log('Sièges à réserver:', finalSeatNumbers);
+
+      // Vérifier que les sièges existent et sont disponibles
+      const { data: existingSeats, error: seatCheckError } = await supabase
+        .from('seat_maps')
+        .select('seat_number, is_available')
+        .eq('trip_id', bookingData.tripId)
+        .in('seat_number', finalSeatNumbers);
+
+      if (seatCheckError) {
+        throw new Error('Impossible de vérifier la disponibilité des sièges');
+      }
+
+      const unavailableSeats = existingSeats?.filter(seat => !seat.is_available) || [];
+      if (unavailableSeats.length > 0) {
+        throw new Error(`Sièges déjà occupés: ${unavailableSeats.map(s => s.seat_number).join(', ')}`);
+      }
+
+      // Marquer tous les sièges comme occupés d'abord
+      const { error: seatError } = await supabase
+        .from('seat_maps')
+        .update({ is_available: false })
+        .eq('trip_id', bookingData.tripId)
+        .in('seat_number', finalSeatNumbers);
+
+      if (seatError) {
+        throw new Error('Impossible de réserver les sièges sélectionnés');
+      }
+
+      console.log(`✅ Sièges ${finalSeatNumbers.join(', ')} marqués comme occupés`);
+
+      // Créer une réservation pour chaque siège
+      const createdBookings = [];
+      const basePrice = bookingData.totalPrice ? Math.floor(bookingData.totalPrice / finalSeatNumbers.length) : 0;
+      
+      for (let i = 0; i < finalSeatNumbers.length; i++) {
+        const seatNumber = finalSeatNumbers[i];
+        const reservationData = {
+          trip_id: bookingData.tripId,
+          user_id: bookingData.userId,
+          seat_number: seatNumber, // UN SEUL siège par réservation
+          passenger_name: userData.full_name || 'Client TravelHub',
+          passenger_phone: userData.phone || '+237600000000',
+          total_price_fcfa: basePrice,
+          booking_reference: `TH${Date.now()}-${i + 1}`, // Référence unique pour chaque réservation
+          booking_status: 'confirmed',
+          payment_status: 'pending'
+        };
+
+        console.log(`Création réservation ${i + 1}/${finalSeatNumbers.length} pour siège ${seatNumber}:`, reservationData);
+
+        const { data, error } = await supabase
+          .from('bookings')
+          .insert(reservationData)
+          .select()
+          .single();
+
+        if (error) {
+          console.error(`❌ Erreur création réservation siège ${seatNumber}:`, error);
+          // En cas d'erreur, libérer les sièges déjà occupés
+          await supabase
+            .from('seat_maps')
+            .update({ is_available: true })
+            .eq('trip_id', bookingData.tripId)
+            .in('seat_number', finalSeatNumbers);
+          throw error;
+        }
+
+        createdBookings.push(data);
+        console.log(`✅ Réservation créée pour siège ${seatNumber}:`, data.id);
+      }
+
+      console.log('=== FIN CRÉATION RÉSERVATIONS MULTIPLES ===');
+      console.log(`✅ ${createdBookings.length} réservations créées avec succès`);
+      return createdBookings;
+      
+    } catch (error) {
+      console.error('❌ ERREUR GÉNÉRALE createMultipleBookings:', error);
+      throw error;
+    }
+  },
+
+  // Créer une nouvelle réservation (ancienne version - maintenant utilisée pour une seule réservation)
   async createBooking(bookingData) {
     try {
       console.log('=== DÉBUT CRÉATION RÉSERVATION ===');

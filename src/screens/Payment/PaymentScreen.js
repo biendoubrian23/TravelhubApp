@@ -215,11 +215,10 @@ const PaymentScreen = ({ route, navigation }) => {
                   </Text>
                 </View>
 
-                {/* Sièges aller VIP */}
-                {selectedSeats && Array.isArray(selectedSeats) && selectedSeats.length > 0 && 
-                 (outboundTrip?.type === 'VIP' || outboundTrip?.bus_type === 'vip' || outboundTrip?.classe === 'VIP') && (
+                {/* Sièges aller */}
+                {selectedSeats && Array.isArray(selectedSeats) && selectedSeats.length > 0 && (
                   <View style={styles.vipSeatsContainer}>
-                    <Text style={styles.vipSeatsTitle}>🪑 Sièges VIP aller :</Text>
+                    <Text style={styles.vipSeatsTitle}>🪑 Sièges aller :</Text>
                     <View style={styles.seatsList}>
                       {selectedSeats.map((seat, index) => (
                         <View key={seat.id || index} style={styles.seatItem}>
@@ -261,11 +260,10 @@ const PaymentScreen = ({ route, navigation }) => {
                   </Text>
                 </View>
 
-                {/* Sièges retour VIP */}
-                {returnSelectedSeats && Array.isArray(returnSelectedSeats) && returnSelectedSeats.length > 0 && 
-                 (returnTrip?.type === 'VIP' || returnTrip?.bus_type === 'vip' || returnTrip?.classe === 'VIP') && (
+                {/* Sièges retour */}
+                {returnSelectedSeats && Array.isArray(returnSelectedSeats) && returnSelectedSeats.length > 0 && (
                   <View style={styles.vipSeatsContainer}>
-                    <Text style={styles.vipSeatsTitle}>🪑 Sièges VIP retour :</Text>
+                    <Text style={styles.vipSeatsTitle}>🪑 Sièges retour :</Text>
                     <View style={styles.seatsList}>
                       {returnSelectedSeats.map((seat, index) => (
                         <View key={seat.id || index} style={styles.seatItem}>
@@ -309,11 +307,10 @@ const PaymentScreen = ({ route, navigation }) => {
                   </Text>
                 </View>
 
-                {/* Sièges VIP pour trajet simple */}
-                {selectedSeats && Array.isArray(selectedSeats) && selectedSeats.length > 0 && 
-                 (trip?.type === 'VIP' || trip?.bus_type === 'vip' || trip?.classe === 'VIP') && (
+                {/* Sièges pour trajet simple */}
+                {selectedSeats && Array.isArray(selectedSeats) && selectedSeats.length > 0 && (
                   <View style={styles.vipSeatsContainer}>
-                    <Text style={styles.vipSeatsTitle}>🪑 Sièges VIP sélectionnés :</Text>
+                    <Text style={styles.vipSeatsTitle}>🪑 Sièges sélectionnés :</Text>
                     <View style={styles.seatsList}>
                       {selectedSeats.map((seat, index) => (
                         <View key={seat.id || index} style={styles.seatItem}>

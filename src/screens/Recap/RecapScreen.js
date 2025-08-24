@@ -209,13 +209,13 @@ const RecapScreen = ({ route, navigation }) => {
           </View>
         )}
 
-        {/* Sièges sélectionnés pour les trajets VIP */}
+        {/* Sièges sélectionnés pour tous les types de trajets */}
         {isRoundTrip && outboundTrip && returnTrip ? (
           <>
-            {/* Sièges aller VIP */}
-            {selectedSeats && selectedSeats.length > 0 && outboundTrip?.is_vip && (
+            {/* Sièges aller */}
+            {selectedSeats && selectedSeats.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>🪑 Sièges VIP - Trajet aller</Text>
+                <Text style={styles.sectionTitle}>🪑 Sièges sélectionnés - Trajet aller</Text>
                 
                 {selectedSeats.map((seat, index) => (
                   <View key={seat.id || index} style={styles.seatItem}>
@@ -229,10 +229,10 @@ const RecapScreen = ({ route, navigation }) => {
               </View>
             )}
 
-            {/* Sièges retour VIP */}
-            {returnSelectedSeats && returnSelectedSeats.length > 0 && returnTrip?.is_vip && (
+            {/* Sièges retour */}
+            {returnSelectedSeats && returnSelectedSeats.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>🪑 Sièges VIP - Trajet retour</Text>
+                <Text style={styles.sectionTitle}>🪑 Sièges sélectionnés - Trajet retour</Text>
                 
                 {returnSelectedSeats.map((seat, index) => (
                   <View key={seat.id || index} style={styles.seatItem}>
@@ -247,10 +247,10 @@ const RecapScreen = ({ route, navigation }) => {
             )}
           </>
         ) : (
-          /* Sièges pour trajet simple VIP */
-          selectedSeats && selectedSeats.length > 0 && trip?.is_vip && (
+          /* Sièges pour trajet simple */
+          selectedSeats && selectedSeats.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>🪑 Sièges VIP sélectionnés</Text>
+              <Text style={styles.sectionTitle}>🪑 Sièges sélectionnés</Text>
               
               {selectedSeats.map((seat, index) => (
                 <View key={seat.id || index} style={styles.seatItem}>

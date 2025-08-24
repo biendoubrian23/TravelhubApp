@@ -28,6 +28,105 @@ export const busService = {
     }
   },
 
+  // Récupérer tous les sièges disponibles pour un trajet (pour tous types de bus)
+  async getAvailableSeatsForTrip(tripId, busId = null) {
+    try {
+      console.log(`Récupération des sièges pour le trajet ${tripId}`);
+      
+      const { data: seats, error } = await supabase
+        .from('seat_maps')
+        .select('*')
+        .eq('trip_id', tripId)
+        .order('position_row', { ascending: true })
+        .order('position_column', { ascending: true });
+
+      if (error) {
+        console.error('Erreur lors de la récupération des sièges:', error);
+        throw error;
+      }
+
+      console.log(`${seats?.length || 0} sièges trouvés pour le trajet ${tripId}`);
+      return seats || [];
+    } catch (error) {
+      console.error('Erreur dans getAvailableSeatsForTrip:', error);
+      throw error;
+    }
+  },
+
+  // Récupérer la disposition VIP des sièges (maintenant utilisé pour tous types)
+  async getVipSeatDisplayLayout(tripId) {
+    try {
+      console.log(`Récupération de la disposition des sièges pour le trajet ${tripId}`);
+      
+      const { data: seats, error } = await supabase
+        .from('seat_maps')
+        .select('*')
+        .eq('trip_id', tripId)
+        .order('position_row', { ascending: true })
+        .order('position_column', { ascending: true });
+
+      if (error) {
+        console.error('Erreur lors de la récupération de la disposition des sièges:', error);
+        throw error;
+      }
+
+      if (!seats || seats.length === 0) {
+        console.log('Aucun siège trouvé pour ce trajet');
+        return {
+          layout: [],
+          stats: {
+            totalSeats: 0,
+            availableSeats: 0,
+            occupiedSeats: 0
+          }
+        };
+      }
+
+      // Organiser les sièges par rangée
+      const seatsByRow = seats.reduce((acc, seat) => {
+        const rowNumber = seat.position_row;
+        if (!acc[rowNumber]) {
+          acc[rowNumber] = [];
+        }
+        acc[rowNumber].push({
+          seatNumber: seat.seat_number,
+          column: seat.position_column,
+          type: seat.seat_type,
+          isAvailable: seat.is_available,
+          priceModifier: seat.price_modifier_fcfa || 0
+        });
+        return acc;
+      }, {});
+
+      // Créer le layout final
+      const layout = Object.keys(seatsByRow)
+        .sort((a, b) => parseInt(a) - parseInt(b))
+        .map(rowNumber => ({
+          rowNumber: parseInt(rowNumber),
+          seats: seatsByRow[rowNumber].sort((a, b) => a.column - b.column)
+        }));
+
+      // Calculer les statistiques
+      const totalSeats = seats.length;
+      const availableSeats = seats.filter(seat => seat.is_available).length;
+      const occupiedSeats = totalSeats - availableSeats;
+
+      console.log(`Disposition chargée: ${totalSeats} sièges total (${availableSeats} libres, ${occupiedSeats} occupés)`);
+
+      return {
+        layout,
+        stats: {
+          totalSeats,
+          availableSeats,
+          occupiedSeats
+        }
+      };
+    } catch (error) {
+      console.error('Erreur dans getVipSeatDisplayLayout:', error);
+      throw error;
+    }
+  },
+
   // Récupérer tous les bus d'une agence
   async getBusesByAgency(agencyId) {
     try {
@@ -46,136 +145,6 @@ export const busService = {
       return buses || []
     } catch (error) {
       console.error('Erreur dans getBusesByAgency:', error)
-      throw error
-    }
-  },
-
-  // Récupérer la configuration des sièges pour un bus
-  async getSeatConfiguration(busId) {
-    try {
-      const { data: seatMaps, error } = await supabase
-        .from('seat_maps')
-        .select('*')
-        .eq('bus_id', busId)
-        .order('seat_number', { ascending: true })
-
-      if (error) {
-        console.error('Erreur lors de la récupération de la configuration des sièges:', error)
-        throw error
-      }
-
-      // Si aucune configuration spécifique n'est trouvée, générer une configuration par défaut
-      if (!seatMaps || seatMaps.length === 0) {
-        const { data: bus } = await this.getBusDetails(busId)
-        return this.generateDefaultSeatLayout(bus.total_seats, bus.is_vip)
-      }
-
-      return seatMaps
-    } catch (error) {
-      console.error('Erreur dans getSeatConfiguration:', error)
-      throw error
-    }
-  },
-
-  // Générer une configuration de sièges par défaut
-  generateDefaultSeatLayout(totalSeats, isVip = false) {
-    const seats = []
-    const seatsPerRow = isVip ? 3 : 4 // VIP: 1+2, Standard: 2+2
-    const rows = Math.ceil(totalSeats / seatsPerRow)
-
-    let seatNumber = 1
-
-    for (let row = 1; row <= rows && seatNumber <= totalSeats; row++) {
-      if (isVip) {
-        // Configuration VIP: 1 siège à gauche, 2 sièges à droite
-        // Siège côté gauche
-        if (seatNumber <= totalSeats) {
-          seats.push({
-            seat_number: seatNumber,
-            row_number: row,
-            seat_letter: 'A',
-            seat_type: 'window',
-            is_vip: true,
-            position: 'left'
-          })
-          seatNumber++
-        }
-
-        // Allée
-        
-        // Sièges côté droit
-        const rightPositions = ['C', 'D']
-        rightPositions.forEach((letter, index) => {
-          if (seatNumber <= totalSeats) {
-            seats.push({
-              seat_number: seatNumber,
-              row_number: row,
-              seat_letter: letter,
-              seat_type: index === 0 ? 'aisle' : 'window',
-              is_vip: true,
-              position: 'right'
-            })
-            seatNumber++
-          }
-        })
-      } else {
-        // Configuration standard: 2 sièges à gauche, 2 sièges à droite
-        const positions = [
-          { letter: 'A', type: 'window', side: 'left' },
-          { letter: 'B', type: 'aisle', side: 'left' },
-          { letter: 'C', type: 'aisle', side: 'right' },
-          { letter: 'D', type: 'window', side: 'right' }
-        ]
-
-        positions.forEach(pos => {
-          if (seatNumber <= totalSeats) {
-            seats.push({
-              seat_number: seatNumber,
-              row_number: row,
-              seat_letter: pos.letter,
-              seat_type: pos.type,
-              is_vip: false,
-              position: pos.side
-            })
-            seatNumber++
-          }
-        })
-      }
-    }
-
-    return seats
-  },
-
-  // Récupérer les sièges disponibles pour un trajet spécifique
-  async getAvailableSeatsForTrip(tripId, busId) {
-    try {
-      // Récupérer la configuration des sièges du bus
-      const seatConfiguration = await this.getSeatConfiguration(busId)
-      
-      // Récupérer les sièges occupés pour ce trajet
-      const { data: occupiedBookings, error: bookingError } = await supabase
-        .from('bookings')
-        .select('seat_number')
-        .eq('trip_id', tripId)
-        .in('payment_status', ['completed', 'pending'])
-
-      if (bookingError) {
-        console.error('Erreur lors de la récupération des réservations:', bookingError)
-        throw bookingError
-      }
-
-      const occupiedSeatNumbers = occupiedBookings ? occupiedBookings.map(b => b.seat_number) : []
-
-      // Marquer les sièges comme disponibles ou occupés
-      const seatsWithAvailability = seatConfiguration.map(seat => ({
-        ...seat,
-        is_available: !occupiedSeatNumbers.includes(seat.seat_number),
-        is_occupied: occupiedSeatNumbers.includes(seat.seat_number)
-      }))
-
-      return seatsWithAvailability
-    } catch (error) {
-      console.error('Erreur dans getAvailableSeatsForTrip:', error)
       throw error
     }
   },

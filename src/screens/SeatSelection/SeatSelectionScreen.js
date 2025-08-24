@@ -55,11 +55,19 @@ const SeatSelectionScreen = ({ route, navigation }) => {
   
   const currentTrip = getCurrentTrip();
   
-  // Vérifier si le trajet actuel est VIP (pour éviter d'afficher des sièges pour un trajet classic)
+  // Tous les trajets peuvent maintenant avoir une sélection de sièges
   const currentTripIsVip = currentTrip?.is_vip || false;
   
   // Récupérer le nombre de passagers depuis les paramètres de recherche
-  const maxSeats = searchParams?.passengers || 1;
+  const maxSeats = searchParams?.passengers || searchParams?.passagers || searchParams?.nbPassengers || 1;
+  
+  console.log('🔍 SeatSelection - Debug info:', {
+    maxSeats,
+    'searchParams?.passengers': searchParams?.passengers,
+    'searchParams?.passagers': searchParams?.passagers,
+    'searchParams?.nbPassengers': searchParams?.nbPassengers,
+    searchParams
+  });
   
   console.log('SeatSelection - Mode:', isRoundTrip ? 'Round trip' : isOutboundOnly ? 'Outbound only (waiting for return)' : 'One way');
   console.log('SeatSelection - Current step:', currentStep);
@@ -83,19 +91,15 @@ const SeatSelectionScreen = ({ route, navigation }) => {
 
     setIsLoadingSeats(true);
     try {
-      // Utiliser la nouvelle fonction pour récupérer la disposition VIP
+      // Utiliser la même fonction pour tous les types de bus (VIP, premium, standard)
+      console.log('Chargement des sièges pour le trajet:', currentTrip.id);
       const seatLayout = await busService.getVipSeatDisplayLayout(currentTrip.id);
       
       if (seatLayout.stats.totalSeats === 0) {
-        console.log('Aucun siège trouvé dans seat_maps, utilisation de la méthode de fallback');
-        // Fallback vers l'ancienne méthode
-        const seatsWithAvailability = await busService.getAvailableSeatsForTrip(
-          currentTrip.id,
-          currentTrip.bus_info.id
-        );
-        setRealSeatMaps(seatsWithAvailability);
+        console.log('Aucun siège trouvé dans seat_maps, génération de sièges mockés');
+        generateMockSeatMaps();
       } else {
-        // Convertir le layout VIP en format compatible avec l'interface existante
+        // Convertir le layout en format compatible avec l'interface existante
         const formattedSeats = []
         seatLayout.layout.forEach(row => {
           row.seats.forEach(seat => {
@@ -111,7 +115,7 @@ const SeatSelectionScreen = ({ route, navigation }) => {
           })
         })
         setRealSeatMaps(formattedSeats);
-        console.log(`Sièges VIP chargés: ${seatLayout.stats.totalSeats} places (${seatLayout.stats.availableSeats} libres, ${seatLayout.stats.occupiedSeats} occupées)`);
+        console.log(`Sièges chargés: ${seatLayout.stats.totalSeats} places (${seatLayout.stats.availableSeats} libres, ${seatLayout.stats.occupiedSeats} occupées)`);
       }
     } catch (error) {
       console.error('Erreur lors du chargement des sièges:', error);
@@ -443,10 +447,38 @@ const SeatSelectionScreen = ({ route, navigation }) => {
   const handleContinue = () => {
     const currentSelectedSeats = currentStep === 'outbound' ? selectedSeats : returnSelectedSeats;
     
+    console.log('🚀 handleContinue - Debug:', {
+      currentStep,
+      'currentSelectedSeats.length': currentSelectedSeats.length,
+      maxSeats,
+      'selectedSeats.length': selectedSeats.length,
+      'returnSelectedSeats.length': returnSelectedSeats.length,
+      isRoundTrip,
+      vipTripOnly,
+      isOutboundOnly
+    });
+    
     if (currentSelectedSeats.length === 0) {
       Alert.alert('Sélection requise', 'Veuillez sélectionner au moins un siège');
       return;
     }
+
+    // Vérifier que le nombre de sièges correspond au nombre de passagers
+    if (currentSelectedSeats.length !== maxSeats) {
+      console.log('❌ Validation échouée:', {
+        'currentSelectedSeats.length': currentSelectedSeats.length,
+        maxSeats,
+        'expected': maxSeats,
+        'actual': currentSelectedSeats.length
+      });
+      Alert.alert(
+        'Sélection incomplète', 
+        `Vous devez sélectionner exactement ${maxSeats} siège(s) pour ${maxSeats} passager(s). Actuellement sélectionnés : ${currentSelectedSeats.length}`
+      );
+      return;
+    }
+
+    console.log(`✅ Validation OK: ${currentSelectedSeats.length} siège(s) sélectionné(s) pour ${maxSeats} passager(s)`);
 
     // Nouvelle logique : si on est en mode "outbound only" (trajet aller VIP seulement)
     if (isOutboundOnly && currentStep === 'outbound') {
@@ -526,28 +558,47 @@ const SeatSelectionScreen = ({ route, navigation }) => {
   const calculateTotalPrice = () => {
     let total = 0
     
-    // Prix du trajet aller (si VIP avec sièges sélectionnés)
-    if (outboundTrip?.is_vip && selectedSeats.length > 0) {
-      total += outboundTrip.prix * selectedSeats.length
-    } else if (outboundTrip && !outboundTrip.is_vip) {
-      // Trajet aller classic : prix de base
-      total += outboundTrip.prix * (searchParams?.passengers || 1)
+    // Prix du trajet aller (avec sièges sélectionnés)
+    if (outboundTrip && selectedSeats.length > 0) {
+      // Calculer le prix de base selon le nombre de sièges sélectionnés
+      const basePrice = outboundTrip.prix || outboundTrip.price_fcfa || 0;
+      total += basePrice * selectedSeats.length;
+      
+      // Ajouter les suppléments des sièges
+      const seatModifiers = selectedSeats.reduce((sum, seat) => sum + (seat.price_modifier_fcfa || 0), 0);
+      total += seatModifiers;
+    } else if (outboundTrip && selectedSeats.length === 0) {
+      // Fallback: prix de base selon le nombre de passagers
+      total += (outboundTrip.prix || outboundTrip.price_fcfa || 0) * (searchParams?.passengers || 1)
     }
     
-    // Prix du trajet retour (si VIP avec sièges sélectionnés)
-    if (returnTrip?.is_vip && returnSelectedSeats.length > 0) {
-      total += returnTrip.prix * returnSelectedSeats.length
-    } else if (returnTrip && !returnTrip.is_vip) {
-      // Trajet retour classic : prix de base
-      total += returnTrip.prix * (searchParams?.passengers || 1)
+    // Prix du trajet retour (avec sièges sélectionnés)
+    if (returnTrip && returnSelectedSeats.length > 0) {
+      // Calculer le prix de base selon le nombre de sièges sélectionnés
+      const basePrice = returnTrip.prix || returnTrip.price_fcfa || 0;
+      total += basePrice * returnSelectedSeats.length;
+      
+      // Ajouter les suppléments des sièges
+      const seatModifiers = returnSelectedSeats.reduce((sum, seat) => sum + (seat.price_modifier_fcfa || 0), 0);
+      total += seatModifiers;
+    } else if (returnTrip && returnSelectedSeats.length === 0) {
+      // Fallback: prix de base selon le nombre de passagers
+      total += (returnTrip.prix || returnTrip.price_fcfa || 0) * (searchParams?.passengers || 1)
     }
     
     // Trajet simple
     if (!outboundTrip && !returnTrip && trip) {
-      if (trip.is_vip && selectedSeats.length > 0) {
-        total += trip.prix * selectedSeats.length
-      } else if (!trip.is_vip) {
-        total += trip.prix * (searchParams?.passengers || 1)
+      if (selectedSeats.length > 0) {
+        // Calculer le prix de base selon le nombre de sièges sélectionnés
+        const basePrice = trip.prix || trip.price_fcfa || 0;
+        total += basePrice * selectedSeats.length;
+        
+        // Ajouter les suppléments des sièges
+        const seatModifiers = selectedSeats.reduce((sum, seat) => sum + (seat.price_modifier_fcfa || 0), 0);
+        total += seatModifiers;
+      } else {
+        // Fallback: prix de base selon le nombre de passagers
+        total += (trip.prix || trip.price_fcfa || 0) * (searchParams?.passengers || 1)
       }
     }
     
@@ -562,52 +613,8 @@ const SeatSelectionScreen = ({ route, navigation }) => {
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Chargement des sièges disponibles...</Text>
         </View>
-      ) : /* Vérification si le trajet actuel nécessite une sélection de sièges */
-      !currentTripIsVip ? (
-        <View style={styles.noSeatSelectionContainer}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()}>
-              <Ionicons name="arrow-back" size={24} color={COLORS.text.primary} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Information</Text>
-            <View style={{ width: 24 }} />
-          </View>
-          
-          <View style={styles.infoContainer}>
-            <Ionicons name="information-circle" size={64} color={COLORS.primary} />
-            <Text style={styles.infoTitle}>Trajet Standard</Text>
-            <Text style={styles.infoText}>
-              Ce trajet ne nécessite pas de sélection de sièges.{'\n'}
-              Vous serez redirigé vers le récapitulatif.
-            </Text>
-            <Button
-              title="Continuer"
-              onPress={() => {
-                // Rediriger vers le récapitulatif approprié
-                if (isRoundTrip) {
-                  navigation.navigate('Recap', {
-                    outboundTrip,
-                    returnTrip,
-                    selectedSeats: currentStep === 'outbound' ? [] : selectedSeats,
-                    returnSelectedSeats: currentStep === 'return' ? [] : returnSelectedSeats,
-                    totalPrice: calculateTotalPrice(),
-                    searchParams
-                  });
-                } else {
-                  navigation.navigate('Recap', {
-                    trip: trip || outboundTrip,
-                    selectedSeats: [],
-                    totalPrice: calculateTotalPrice(),
-                    searchParams
-                  });
-                }
-              }}
-              style={{ marginTop: SPACING.lg }}
-            />
-          </View>
-        </View>
       ) : (
-      /* Interface normale de sélection de sièges VIP */
+      /* Interface de sélection de sièges pour tous les types de transports */
       <>
       {/* Header */}
       <View style={styles.header}>
@@ -696,7 +703,10 @@ const SeatSelectionScreen = ({ route, navigation }) => {
       <View style={styles.summary}>
         <View style={styles.summaryInfo}>
           <Text style={styles.summaryText}>
-            {selectedSeats.length} siège(s) sélectionné(s)
+            {(currentStep === 'outbound' ? selectedSeats : returnSelectedSeats).length} / {maxSeats} siège(s) sélectionné(s)
+          </Text>
+          <Text style={styles.summarySubtext}>
+            {maxSeats > 1 ? `Sélectionnez ${maxSeats} sièges pour ${maxSeats} passagers` : 'Sélectionnez votre siège'}
           </Text>
           <Text style={styles.summaryPrice}>
             {isNaN(totalPrice) ? '0' : totalPrice.toLocaleString()} FCFA
@@ -980,21 +990,26 @@ const styles = StyleSheet.create({
   },
   
   summaryInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: SPACING.md,
   },
   
   summaryText: {
     fontSize: 16,
     color: COLORS.text.primary,
+    fontWeight: '600',
+  },
+  
+  summarySubtext: {
+    fontSize: 14,
+    color: COLORS.text.secondary,
+    marginTop: 4,
   },
   
   summaryPrice: {
     fontSize: 18,
     fontWeight: '600',
     color: COLORS.primary,
+    marginTop: SPACING.sm,
   },
   
   buttonDisabled: {

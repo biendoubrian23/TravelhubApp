@@ -118,16 +118,16 @@ export const useBookingsStore = create(devtools((set, get) => ({
         }
         
         console.log('💾 Sauvegarde réservation en BD avec données mappées:', bookingData)
-        const data = await bookingService.createBooking(bookingData)
+        const data = await bookingService.createMultipleBookings(bookingData)
         
-        if (data) {
-          console.log('✅ Réservation sauvegardée dans Supabase:', data)
+        if (data && Array.isArray(data) && data.length > 0) {
+          console.log(`✅ ${data.length} réservations sauvegardées dans Supabase:`, data)
           
-          // Mettre à jour la réservation locale avec l'ID de la BD
+          // Mettre à jour la réservation locale avec les IDs de la BD
           set((state) => {
             const updatedBookings = state.bookings.map(b => 
               b.id === booking.id 
-                ? { ...b, supabaseId: data.id, syncedWithDB: true }
+                ? { ...b, supabaseIds: data.map(d => d.id), syncedWithDB: true }
                 : b
             );
             return { bookings: updatedBookings };

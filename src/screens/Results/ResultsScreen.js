@@ -207,21 +207,13 @@ const ResultsScreen = ({ navigation, route }) => {
 
   const handleTripSelect = (trip) => {
     if (!searchParams.isRoundTrip) {
-      // Trajet simple - aller directement au détail ou à la sélection de siège
+      // Trajet simple - aller directement à la sélection de siège pour tous les types
       setCurrentTrip(trip)
-      if (trip.is_vip) {
-        // Pour les trajets VIP, aller à la sélection de siège
-        navigation.navigate('SeatSelection', { 
-          trip: trip,
-          searchParams: localSearchParams
-        })
-      } else {
-        // Pour les trajets classic, aller directement au récapitulatif
-        navigation.navigate('Recap', { 
-          trip: trip,
-          searchParams: localSearchParams
-        })
-      }
+      // Maintenant tous les trajets permettent la sélection de sièges
+      navigation.navigate('SeatSelection', { 
+        trip: trip,
+        searchParams: localSearchParams
+      })
     } else {
       // Trajet aller-retour
       if (!showingReturnTrips) {
@@ -229,82 +221,30 @@ const ResultsScreen = ({ navigation, route }) => {
         setCurrentTrip(trip)
         setBookingStep('return')
         
-        // Si le trajet aller est VIP, aller directement à la sélection de siège
-        if (trip.is_vip) {
-          navigation.navigate('SeatSelection', { 
-            outboundTrip: trip,
-            returnTrip: null, // Pas encore de trajet retour
-            searchParams: localSearchParams,
-            showReturnSelection: true // Indiquer qu'on doit revenir pour le retour
-          })
-        } else {
-          // Si le trajet aller n'est pas VIP, passer au choix du retour
-          setShowingReturnTrips(true)
-        }
+        // Aller à la sélection de siège pour l'aller (tous types de trajets)
+        navigation.navigate('SeatSelection', { 
+          outboundTrip: trip,
+          returnTrip: null, // Pas encore de trajet retour
+          searchParams: localSearchParams,
+          showReturnSelection: true // Indiquer qu'on doit revenir pour le retour
+        })
       } else {
         // Sélection du trajet retour
         setReturnTrip(trip)
         setBookingStep('seats')
         
-        // Nouvelle logique : naviguer selon les types de trajets
-        const outboundIsVip = currentTrip.is_vip
-        const returnIsVip = trip.is_vip
-        
-        if (outboundIsVip && returnIsVip) {
-          // Les deux trajets sont VIP : sélection de sièges pour les deux
-          const navigationParams = { 
-            outboundTrip: currentTrip,
-            returnTrip: trip,
-            searchParams: localSearchParams
-          }
-          
-          if (outboundSeats.length > 0) {
-            navigationParams.preselectedOutboundSeats = outboundSeats
-          }
-          
-          navigation.navigate('SeatSelection', navigationParams)
-        } else if (outboundIsVip && !returnIsVip) {
-          // Seul le trajet aller est VIP
-          if (outboundSeats.length > 0) {
-            // Sièges aller déjà sélectionnés, aller au récapitulatif
-            navigation.navigate('Recap', { 
-              outboundTrip: currentTrip,
-              returnTrip: trip,
-              selectedSeats: outboundSeats,
-              returnSelectedSeats: [], // Pas de sièges à sélectionner pour le retour
-              searchParams: localSearchParams
-            })
-          } else {
-            // Sélection de sièges pour l'aller seulement
-            navigation.navigate('SeatSelection', { 
-              outboundTrip: currentTrip,
-              returnTrip: trip,
-              searchParams: localSearchParams,
-              vipTripOnly: 'outbound' // Indiquer que seul l'aller nécessite des sièges
-            })
-          }
-        } else if (!outboundIsVip && returnIsVip) {
-          // Seul le trajet retour est VIP : sélection de sièges pour le retour seulement
-          navigation.navigate('SeatSelection', { 
-            outboundTrip: currentTrip,
-            returnTrip: trip,
-            searchParams: localSearchParams,
-            vipTripOnly: 'return' // Indiquer que seul le retour nécessite des sièges
-          })
-        } else {
-          // Aucun trajet VIP : aller directement au récapitulatif
-          const recapParams = { 
-            outboundTrip: currentTrip,
-            returnTrip: trip,
-            searchParams: localSearchParams
-          }
-          
-          if (outboundSeats.length > 0) {
-            recapParams.preselectedOutboundSeats = outboundSeats
-          }
-          
-          navigation.navigate('Recap', recapParams)
+        // Tous les trajets permettent maintenant la sélection de sièges
+        const navigationParams = { 
+          outboundTrip: currentTrip,
+          returnTrip: trip,
+          searchParams: localSearchParams
         }
+        
+        if (outboundSeats.length > 0) {
+          navigationParams.preselectedOutboundSeats = outboundSeats
+        }
+        
+        navigation.navigate('SeatSelection', navigationParams)
       }
     }
   }
