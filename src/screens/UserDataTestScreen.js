@@ -43,22 +43,27 @@ const UserDataTestScreen = () => {
   const testCreateUser = async () => {
     try {
       const testData = {
-        full_name: 'Test User ' + Date.now(),
+        nom: 'TestNom',
+        prenom: 'TestPrenom',
         telephone: '+237699123456',
-        ville: 'Douala'
+        ville: 'Douala',
+        full_name: 'TestPrenom TestNom'
       };
 
       const email = `test${Date.now()}@test.com`;
       const password = 'test123456';
 
-      Alert.alert('Test', `Création utilisateur: ${email}`);
+      console.log('🔍 Test création utilisateur avec:', testData);
+      Alert.alert('Test', `Création utilisateur: ${email}\nTéléphone: ${testData.telephone}\nVille: ${testData.ville}`);
 
       const result = await authService.signUp(email, password, testData);
       
       if (result.error) {
         Alert.alert('Erreur', result.error.message);
+        console.error('❌ Erreur inscription test:', result.error);
       } else {
-        Alert.alert('Succès', 'Utilisateur créé, vérifiez les données');
+        Alert.alert('Succès', 'Utilisateur créé, vérifiez les logs et les données');
+        console.log('✅ Inscription test réussie:', result.data);
         // Recharger les données après 2 secondes
         setTimeout(loadUserData, 2000);
       }
@@ -72,6 +77,7 @@ const UserDataTestScreen = () => {
 
     } catch (err) {
       Alert.alert('Erreur', err.message);
+      console.error('❌ Erreur test inscription:', err);
     }
   };
 

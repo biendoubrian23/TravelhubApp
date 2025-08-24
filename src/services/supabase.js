@@ -5,6 +5,8 @@ export const authService = {
   // Inscription
   async signUp(email, password, userData) {
     try {
+      console.log('🔍 Données reçues pour inscription:', userData);
+      
       // 1. Créer l'utilisateur dans Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -19,7 +21,15 @@ export const authService = {
         }
       })
 
+      console.log('🔍 Métadonnées Auth à sauvegarder:', {
+        full_name: userData.full_name || `${userData.prenom || ''} ${userData.nom || ''}`.trim(),
+        phone: userData.telephone || userData.phone || '',
+        ville: userData.ville || null,
+        role: 'client'
+      });
+
       if (error) {
+        console.error('❌ Erreur Auth signup:', error);
         return { data, error }
       }
 
@@ -55,6 +65,8 @@ export const authService = {
             generated_by: null
           }
 
+          console.log('🔍 Données à insérer dans table users:', userRecord);
+
           const { data: userInsertData, error: userInsertError } = await supabase
             .from('users')
             .insert(userRecord)
@@ -62,14 +74,47 @@ export const authService = {
             .single()
 
           if (userInsertError) {
-            console.error('Erreur lors de la création de l\'utilisateur dans users:', userInsertError)
+            console.error('❌ Erreur lors de la création de l\'utilisateur dans users:', userInsertError)
             // L'utilisateur Auth existe mais pas dans users - on pourrait rollback ici
             // Pour l'instant on continue, l'utilisateur pourra se connecter
           } else {
-            console.log('Utilisateur créé avec succès dans la table users:', userInsertData)
+            console.log('✅ Utilisateur créé avec succès dans la table users:', userInsertData)
           }
         } else {
-          console.log('Utilisateur existe déjà dans la table users:', existingUser.id)
+          console.log('ℹ️ Utilisateur existe déjà dans la table users:', existingUser.id);
+          
+          // Vérifier si les données phone/ville sont manquantes et les mettre à jour
+          if (!existingUser.phone || !existingUser.ville) {
+            console.log('🔧 Mise à jour des données manquantes pour utilisateur existant');
+            
+            const updateData = {};
+            if (!existingUser.phone && (userData.telephone || userData.phone)) {
+              updateData.phone = userData.telephone || userData.phone;
+            }
+            if (!existingUser.ville && userData.ville) {
+              updateData.ville = userData.ville;
+            }
+            if (!existingUser.full_name && userData.full_name) {
+              updateData.full_name = userData.full_name;
+            }
+            
+            if (Object.keys(updateData).length > 0) {
+              console.log('🔍 Données à mettre à jour:', updateData);
+              
+              const { data: updatedUser, error: updateError } = await supabase
+                .from('users')
+                .update(updateData)
+                .eq('id', data.user.id)
+                .select()
+                .single();
+                
+              if (updateError) {
+                console.error('❌ Erreur mise à jour utilisateur:', updateError);
+              } else {
+                console.log('✅ Utilisateur mis à jour avec succès:', updatedUser);
+              }
+            }
+          }
         }
       }
 
