@@ -98,7 +98,8 @@ export const bookingService = {
           total_price_fcfa: basePrice,
           booking_reference: `TH${Date.now()}-${i + 1}`, // Référence unique pour chaque réservation
           booking_status: 'confirmed',
-          payment_status: 'pending'
+          payment_status: 'pending',
+          payment_method: bookingData.paymentMethod || 'orange_money' // Ajouter le moyen de paiement
         };
 
         console.log(`Création réservation ${i + 1}/${finalSeatNumbers.length} pour siège ${seatNumber}:`, reservationData);
@@ -338,6 +339,46 @@ export const bookingService = {
     } catch (error) {
       console.error('❌ ERREUR GÉNÉRALE createBooking:', error);
       throw error;
+    }
+  },
+
+  // Mettre à jour le statut de paiement de plusieurs réservations (pour les réservations multiples)
+  async updateMultiplePaymentStatus(bookingIds, paymentStatus, paymentDetails = {}) {
+    try {
+      console.log(`Mise à jour du statut de paiement pour ${bookingIds.length} réservations:`, bookingIds);
+      
+      const updateData = {
+        payment_status: paymentStatus,
+        updated_at: new Date().toISOString()
+      }
+
+      // Ajouter les détails de paiement si fournis
+      if (paymentDetails.transactionId) {
+        updateData.payment_transaction_id = paymentDetails.transactionId
+      }
+      if (paymentDetails.paymentMethod) {
+        updateData.payment_method = paymentDetails.paymentMethod
+      }
+      if (paymentStatus === 'completed') {
+        updateData.paid_at = new Date().toISOString()
+      }
+
+      const { data, error } = await supabase
+        .from('bookings')
+        .update(updateData)
+        .in('id', bookingIds)
+        .select()
+
+      if (error) {
+        console.error('Erreur lors de la mise à jour des paiements multiples:', error)
+        throw error
+      }
+
+      console.log(`✅ Statut de paiement mis à jour pour ${data.length} réservations:`, data)
+      return data
+    } catch (error) {
+      console.error('Erreur dans updateMultiplePaymentStatus:', error)
+      throw error
     }
   },
 

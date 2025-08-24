@@ -124,7 +124,7 @@ const PaymentScreen = ({ route, navigation }) => {
           total_price_fcfa: totalPrice,
           trip: trip,
           selectedSeats: selectedSeats,
-          payment_method: selectedPaymentMethod === 'orange_money' ? 'Orange Money' : 'MTN Mobile Money'
+          payment_method: selectedPaymentMethod === 'orange_money' ? 'orange_money' : 'mtn_momo'
         };
 
         // Fermer le modal et rediriger vers l'écran de succès
@@ -151,7 +151,7 @@ const PaymentScreen = ({ route, navigation }) => {
         total_price_fcfa: totalPrice,
         trip: trip,
         selectedSeats: selectedSeats,
-        payment_method: 'Carte bancaire'
+        payment_method: 'stripe'
       };
 
       // Fermer le modal et rediriger vers l'écran de succès

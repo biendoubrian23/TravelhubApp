@@ -271,7 +271,7 @@ export const useBookingsStore = create(devtools((set, get) => ({
           seatNumber: booking.seatNumber,
           // Ne plus passer les infos génériques - le service les récupérera depuis la table users
           totalPrice: booking.price || booking.totalPrice || 0,
-          paymentMethod: booking.paymentMethod || 'mobile_money',
+          paymentMethod: booking.paymentMethod || 'orange_money',
           selectedSeats: booking.selectedSeats // Pour les sièges VIP
         }
         

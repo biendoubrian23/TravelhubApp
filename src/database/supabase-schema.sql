@@ -79,7 +79,7 @@ CREATE TABLE public.bookings (
   nombre_passagers INTEGER NOT NULL DEFAULT 1,
   prix_total INTEGER NOT NULL,
   status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'cancelled', 'completed')),
-  payment_method VARCHAR(20) DEFAULT 'stripe' CHECK (payment_method IN ('stripe', 'orange_money', 'cash')),
+  payment_method VARCHAR(20) DEFAULT 'orange_money' CHECK (payment_method IN ('stripe', 'orange_money', 'mtn_momo', 'cash')),
   payment_status VARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'failed', 'refunded')),
   booking_reference VARCHAR(20) UNIQUE NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
