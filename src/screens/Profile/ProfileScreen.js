@@ -295,10 +295,57 @@ const ProfileScreen = ({ navigation }) => {
         {/* Voyage */}
         <MenuSection title="Mes voyages">
           <MenuItem
+            icon="time"
+            title="Historique des voyages"
+            subtitle="Consultez vos trajets passés"
+            onPress={() => navigation.navigate('TripHistory')}
+          />
+          
+          <MenuItem
+            icon="heart"
+            title="Trajets favoris"
+            subtitle="Vos destinations préférées"
+            onPress={() => {
+              // Navigation vers l'onglet Favorites dans ClientMain
+              navigation.reset({
+                index: 0,
+                routes: [{ 
+                  name: 'ClientMain',
+                  state: {
+                    index: 2, // Index 2 correspond à l'onglet "Favorites"
+                    routes: [
+                      { name: 'Home' },
+                      { name: 'Bookings' },
+                      { name: 'Favorites' },
+                      { name: 'Profile' }
+                    ]
+                  }
+                }]
+              });
+            }}
+          />
+          
+          <MenuItem
             icon="receipt"
             title="Factures et reçus"
             subtitle="Téléchargez vos justificatifs"
-            onPress={() => Alert.alert('Bientôt disponible', 'Cette fonctionnalité sera disponible prochainement')}
+            onPress={() => navigation.navigate('Invoices')}
+          />
+          
+          <MenuItem
+            icon="flask"
+            title="🧪 Créer facture test"
+            subtitle="Générer une facture de démonstration"
+            onPress={async () => {
+              try {
+                const { createTestInvoice } = await import('../../utils/testInvoices');
+                await createTestInvoice(user.id);
+                Alert.alert('Succès', 'Facture de test créée ! Consultez vos factures.');
+              } catch (error) {
+                Alert.alert('Erreur', 'Impossible de créer la facture de test');
+                console.error('Erreur test facture:', error);
+              }
+            }}
           />
         </MenuSection>
 

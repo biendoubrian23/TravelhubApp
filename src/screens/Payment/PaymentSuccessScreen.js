@@ -120,6 +120,23 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
         if (savedBookings && Array.isArray(savedBookings) && savedBookings.length > 0) {
           // Réservations sauvegardées dans Supabase
           
+          // 🆕 CRÉER LA FACTURE PDF AUTOMATIQUEMENT
+          try {
+            logger.info('🧾 Création de la facture PDF...');
+            const firstBooking = savedBookings[0]; // Utiliser la première réservation pour la facture
+            
+            // Import dynamique du service de factures pour éviter les erreurs au démarrage
+            const { invoiceService } = await import('../../services/invoiceService');
+            const invoiceData = await invoiceService.createInvoice(firstBooking, user);
+            
+            if (invoiceData) {
+              logger.info('✅ Facture créée avec succès:', invoiceData.invoice_number);
+            }
+          } catch (invoiceError) {
+            logger.error('❌ Erreur création facture:', invoiceError);
+            // Ne pas faire échouer le processus si la facture échoue
+          }
+          
           // 🆕 MARQUER LES RÉCOMPENSES COMME UTILISÉES
           if (rewardsToUse && Array.isArray(rewardsToUse) && rewardsToUse.length > 0 && referralDiscount > 0) {
             // Marquage des récompenses de parrainage comme utilisées

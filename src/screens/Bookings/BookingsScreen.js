@@ -139,7 +139,7 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
     return matchesSearch && booking.booking_status === filter;
   });
   
-  console.log('BookingsScreen - Nombre de réservations:', bookings.length);
+  console.log('BookingsScreen - Nombre de réservations:', bookings?.length || 0);
   const getStatusColor = (status) => {
     switch (status) {
       case 'confirmed': return '#4CAF50';

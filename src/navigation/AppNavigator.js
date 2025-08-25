@@ -44,6 +44,10 @@ import TripHistoryScreen from '../screens/TripHistory/TripHistoryScreen';
 // Referral Screens
 import ReferralScreen from '../screens/Referral/ReferralScreen';
 
+// Invoice Screens
+import InvoicesScreen from '../screens/Invoices/InvoicesScreen';
+import InvoicePreviewScreen from '../screens/Invoices/InvoicePreviewScreen';
+
 // Store
 import { useAuthStore } from '../store'
 import { COLORS } from '../constants'
@@ -207,6 +211,26 @@ const AppNavigator = () => {
               component={TripHistoryScreen}
               options={{
                 title: 'Historique des voyages',
+                presentation: 'card',
+                animationTypeForReplace: 'push',
+              }}
+            />
+
+            {/* Invoice Screen */}
+            <Stack.Screen 
+              name="Invoices" 
+              component={InvoicesScreen}
+              options={{
+                title: 'Mes Factures',
+                presentation: 'card',
+                animationTypeForReplace: 'push',
+              }}
+            />
+            <Stack.Screen 
+              name="InvoicePreview" 
+              component={InvoicePreviewScreen}
+              options={{
+                title: 'Aperçu Facture',
                 presentation: 'card',
                 animationTypeForReplace: 'push',
               }}
