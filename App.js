@@ -11,7 +11,7 @@ import AppNavigator from './src/navigation/AppNavigator'
 import { COLORS } from './src/constants'
 
 // Services
-import avatarService from './src/services/avatarServiceSimple'
+// import avatarService from './src/services/avatarService' // Avatar désactivé temporairement
 
 // Thème personnalisé en mode clair uniquement
 const lightTheme = {
@@ -26,25 +26,13 @@ const lightTheme = {
 }
 
 export default function App() {
-  // Initialiser les services au démarrage
-  useEffect(() => {
-    const initializeServices = async () => {
-      try {
-        // Initialiser le bucket avatars
-        await avatarService.initializeBucket();
-        console.log('✅ Services d\'avatar initialisés');
-      } catch (error) {
-        console.error('❌ Erreur lors de l\'initialisation des services:', error);
-      }
-    };
-
-    initializeServices();
-  }, []);
-
+  // Note: L'initialisation du bucket avatars doit être faite via SQL côté Supabase
+  // pour éviter les erreurs de permissions RLS
+  
   return (
     <PaperProvider theme={lightTheme}>
       <View style={styles.container}>
-        <StatusBar style="dark" backgroundColor={COLORS.background} />
+        <StatusBar style="dark" />
         <AppNavigator />
         <Toast />
       </View>

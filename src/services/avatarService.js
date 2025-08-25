@@ -85,20 +85,17 @@ class AvatarService {
       const timestamp = Date.now();
       const fileName = `${userId}/avatar_${timestamp}.jpg`;
 
-      // 3. Lire le fichier
-      const formData = new FormData();
-      formData.append('file', {
-        uri: processedImage.uri,
-        type: 'image/jpeg',
-        name: fileName,
-      });
+      // 3. Convertir l'image en blob pour l'upload
+      const response = await fetch(processedImage.uri);
+      const blob = await response.blob();
 
       // 4. Upload vers Supabase Storage
       const { data, error } = await supabase.storage
         .from(this.bucketName)
-        .upload(fileName, formData, {
+        .upload(fileName, blob, {
           cacheControl: '3600',
           upsert: true, // Remplacer si existe déjà
+          contentType: 'image/jpeg'
         });
 
       if (error) {

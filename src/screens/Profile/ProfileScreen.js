@@ -15,7 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
-import avatarService from '../../services/avatarServiceSimple';
+// import avatarService from '../../services/avatarService';
+// import avatarService from '../../services/avatarServiceClean';
+import avatarService from '../../services/avatarServiceDisabled';
 
 const ProfileScreen = ({ navigation }) => {
   const { user, signOut, updateProfile } = useAuthStore();
@@ -146,38 +148,15 @@ const ProfileScreen = ({ navigation }) => {
     );
   };
 
-  const [avatarLoading, setAvatarLoading] = useState(false);
+  const [avatarLoading, setAvatarLoading] = useState(false); // Gardé pour éviter les erreurs, mais non utilisé
 
   const pickProfileImage = async () => {
-    try {
-      setAvatarLoading(true);
-      
-      // Utiliser la version simplifiée temporairement
-      const result = await avatarService.changeAvatarSimple(user.id);
-      
-      if (result.success) {
-        Alert.alert(
-          'Succès !',
-          result.message,
-          [{ text: 'OK' }]
-        );
-        
-        // Recharger les données utilisateur
-        loadUserStats();
-      } else {
-        // Pas d'alerte d'erreur car le service affiche déjà sa propre alerte
-        console.log('Service avatar:', result.message);
-      }
-    } catch (error) {
-      console.error('Erreur lors du changement d\'avatar:', error);
-      Alert.alert(
-        'Erreur',
-        'Une erreur inattendue s\'est produite',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setAvatarLoading(false);
-    }
+    // Fonctionnalité désactivée temporairement
+    Alert.alert(
+      'Photo de profil',
+      'Cette fonctionnalité sera disponible prochainement. Restez connecté pour les futures mises à jour !',
+      [{ text: 'Compris', style: 'default' }]
+    );
   };
 
   const referFriend = async () => {
