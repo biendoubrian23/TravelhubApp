@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Calendar } from 'react-native-calendars'
-import { Button, Input } from '../../components'
+import { Button, Input, AdCarousel } from '../../components'
 import { COLORS, SPACING, BORDER_RADIUS, CITIES } from '../../constants'
 import { useSearchStore } from '../../store'
 import { formatDate } from '../../utils/helpers'
@@ -304,6 +304,17 @@ const HomeScreen = ({ navigation }) => {
             </View>
           </View>
         </ImageBackground>
+        
+        {/* Publicités */}
+        <AdCarousel 
+          onAdPress={(ad) => {
+            Alert.alert(
+              ad.title,
+              `${ad.description}\nValable jusqu'au: ${ad.expiryDate}`,
+              [{ text: 'Fermer', style: 'cancel' }]
+            );
+          }} 
+        />
 
         {/* Quick Access */}
         <View style={styles.quickAccessContainer}>
