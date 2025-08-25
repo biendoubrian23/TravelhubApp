@@ -153,22 +153,54 @@ export const useAuthStore = create(devtools((set, get) => ({
       // Importer Supabase ici pour éviter les imports circulaires
       const { supabase } = await import('../services/supabase')
       
-      // Utiliser getSession au lieu de getUser pour éviter l'erreur "Auth session missing!"
-      const { data: { session }, error } = await supabase.auth.getSession()
+      console.log('🔍 Vérification de la session utilisateur...')
       
-      if (error) {
-        console.warn('Erreur lors de la récupération de la session:', error)
+      try {
+        // Récupérer la session actuelle
+        const { data, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.warn('⚠️ Erreur lors de la récupération de la session:', error.message)
+          set({ user: null, isAuthenticated: false, isLoading: false })
+          return
+        }
+        
+        const session = data?.session
+        
+        if (session?.user) {
+          console.log('✅ Session utilisateur active:', session.user.email)
+          set({ user: session.user, isAuthenticated: true, isLoading: false })
+          
+          // Pour s'assurer que la session reste active, on configure un écouteur d'événements
+          console.log('📡 Configuration de l\'écouteur d\'événements de session...')
+          
+          // Configurer un événement pour la session
+          const { data: authListener } = supabase.auth.onAuthStateChange((event, newSession) => {
+            console.log('🔔 Événement d\'authentification:', event)
+            
+            if (event === 'SIGNED_OUT') {
+              console.log('👋 Utilisateur déconnecté')
+              set({ user: null, isAuthenticated: false })
+            } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && newSession?.user) {
+              console.log('🔄 Session mise à jour:', newSession.user.email)
+              set({ user: newSession.user, isAuthenticated: true })
+            }
+          })
+          
+          // Retourner une fonction pour désinscrire l'écouteur si nécessaire
+          return () => {
+            console.log('🛑 Nettoyage de l\'écouteur d\'événements de session')
+            authListener.subscription.unsubscribe()
+          }
+        } else {
+          console.log('ℹ️ Aucune session utilisateur active')
+          set({ user: null, isAuthenticated: false, isLoading: false })
+        }
+      } catch (sessionError) {
+        console.error('❌ Erreur lors de la vérification de session:', sessionError)
         set({ user: null, isAuthenticated: false, isLoading: false })
-        return
       }
       
-      if (session?.user) {
-        console.log('Session utilisateur trouvée:', session.user.email)
-        set({ user: session.user, isAuthenticated: true, isLoading: false })
-      } else {
-        console.log('Aucune session utilisateur active')
-        set({ user: null, isAuthenticated: false, isLoading: false })
-      }
 
       // Écouter les changements d'état d'authentification
       supabase.auth.onAuthStateChange((event, session) => {

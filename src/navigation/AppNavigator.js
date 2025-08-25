@@ -3,7 +3,9 @@ import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, Alert, Modal, Text, TouchableOpacity } from 'react-native';
+// Import temporairement désactivé en raison de problèmes avec le module natif
+// import deviceSecurityService from '../services/deviceSecurityService';
 
 // Screens
 import HomeScreen from '../screens/Home/HomeScreen';
@@ -38,7 +40,7 @@ import TermsConditionsScreen from '../screens/Profile/TermsConditionsScreen';
 import PrivacyPolicyScreen from '../screens/Profile/PrivacyPolicyScreen';
 // Temporairement désactivés
 // import AboutScreen from '../screens/Profile/AboutScreen';
-// import SecuritySettingsScreen from '../screens/Profile/SecuritySettingsScreen';
+import SecuritySettingsScreen from '../screens/Profile/SecuritySettingsScreen';
 import TripHistoryScreen from '../screens/TripHistory/TripHistoryScreen';
 
 // Referral Screens
@@ -112,22 +114,63 @@ const ClientTabNavigator = () => {
 const AppNavigator = () => {
   const { user, isLoading, isAuthenticated, initialize } = useAuthStore()
   const [hasInitialized, setHasInitialized] = React.useState(false)
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const [authFailed, setAuthFailed] = useState(false)
 
   useEffect(() => {
     const init = async () => {
-      await initialize()
-      setHasInitialized(true)
+      try {
+        console.log('🔄 Initialisation de la session...')
+        await initialize()
+        console.log('✅ Initialisation de la session terminée')
+        
+        // NOTE: Authentification biométrique temporairement désactivée en raison de problèmes avec le module natif
+        // Nous avons retiré la vérification d'authentification biométrique pour éviter les crashs
+      } catch (error) {
+        console.error('❌ Erreur lors de l\'initialisation de la session:', error)
+      } finally {
+        setHasInitialized(true)
+      }
     }
     init()
   }, [])
 
-  // Écran de chargement initial
-  if (isLoading || !hasInitialized) {
+  // Écran de chargement minimal pendant l'initialisation
+  if (isLoading || !hasInitialized || isAuthenticating) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={[styles.loadingContainer, { backgroundColor: COLORS.surface }]}>
+        <ActivityIndicator size="small" color={COLORS.primary} />
+        {isAuthenticating && (
+          <Text style={styles.loadingText}>Vérification de l'identité...</Text>
+        )}
       </View>
     )
+  }
+  
+  // Si l'authentification a échoué, afficher un écran bloquant
+  if (authFailed) {
+    return (
+      <View style={styles.authFailedContainer}>
+        <Ionicons name="lock-closed" size={64} color={COLORS.primary} />
+        <Text style={styles.authFailedTitle}>Authentification requise</Text>
+        <Text style={styles.authFailedText}>
+          Pour accéder à l'application, vous devez utiliser le système de sécurité de votre appareil.
+        </Text>
+        <TouchableOpacity
+          style={styles.authRetryButton}
+          onPress={async () => {
+            setIsAuthenticating(true);
+            const authResult = await deviceSecurityService.authenticate();
+            setIsAuthenticating(false);
+            if (authResult.success) {
+              setAuthFailed(false);
+            }
+          }}
+        >
+          <Text style={styles.authRetryButtonText}>Réessayer</Text>
+        </TouchableOpacity>
+      </View>
+    );
   }
 
   console.log('🔍 AppNavigator - État auth:', { 
@@ -207,6 +250,15 @@ const AppNavigator = () => {
               }}
             />
             <Stack.Screen 
+              name="SecuritySettings" 
+              component={SecuritySettingsScreen}
+              options={{
+                title: 'Sécurité',
+                presentation: 'card',
+                animationTypeForReplace: 'push',
+              }}
+            />
+            <Stack.Screen 
               name="TripHistory" 
               component={TripHistoryScreen}
               options={{
@@ -271,13 +323,9 @@ const AppNavigator = () => {
           // Interface utilisateur non connecté
           <>
             <Stack.Screen 
-              name="Splash" 
-              component={SplashScreen}
-              options={{ gestureEnabled: false }}
-            />
-            <Stack.Screen 
               name="Login" 
               component={LoginScreen}
+              options={{ animationEnabled: false }}
             />
             <Stack.Screen 
               name="Signup" 
@@ -408,6 +456,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.background,
   },
+  loadingText: {
+    marginTop: 16,
+    color: COLORS.text.secondary,
+    fontSize: 14
+  },
+  authFailedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    padding: 20
+  },
+  authFailedTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: COLORS.text.primary,
+    marginTop: 20,
+    marginBottom: 10
+  },
+  authFailedText: {
+    fontSize: 16,
+    color: COLORS.text.secondary,
+    textAlign: 'center',
+    marginBottom: 30
+  },
+  authRetryButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+    marginTop: 10
+  },
+  authRetryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600'
+  }
 })
 
 export default AppNavigator

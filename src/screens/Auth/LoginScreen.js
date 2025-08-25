@@ -49,12 +49,30 @@ const LoginScreen = ({ navigation, route }) => {
     }
 
     setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    
+    // Si des erreurs sont présentes, afficher un toast
+    if (Object.keys(newErrors).length > 0) {
+      const firstError = Object.values(newErrors)[0];
+      Toast.show({
+        type: 'error',
+        text1: 'Formulaire incomplet',
+        text2: firstError,
+        visibilityTime: 3000,
+        position: 'top',
+      });
+      return false;
+    }
+    
+    return true;
   }
 
   // Fonction pour effacer les erreurs quand l'utilisateur tape
   const clearErrors = () => {
-    if (loginError) setLoginError('')
+    if (loginError) {
+      setLoginError('')
+      // Masquer le toast d'erreur si nécessaire
+      Toast.hide()
+    }
     if (Object.keys(errors).length > 0) setErrors({})
   }
 
@@ -72,18 +90,32 @@ const LoginScreen = ({ navigation, route }) => {
         // Log simple pour le débogage
         console.log('Tentative de connexion échouée:', error.message)
         
+        let errorMessage = '';
+        
         // Messages d'erreur simplifiés et clairs
         if (error.message.includes('Invalid login credentials')) {
-          setLoginError('Email ou mot de passe incorrect. Veuillez vérifier vos informations.')
+          errorMessage = 'Email ou mot de passe incorrect. Veuillez vérifier vos informations.';
         } else if (error.message.includes('Email not confirmed')) {
-          setLoginError('Votre compte n\'est pas encore confirmé. Vérifiez votre email ou cliquez ci-dessous pour renvoyer l\'email de confirmation.')
+          errorMessage = 'Votre compte n\'est pas encore confirmé. Vérifiez votre email ou cliquez ci-dessous pour renvoyer l\'email de confirmation.';
         } else if (error.message.includes('rate limit') || error.message.includes('too many')) {
-          setLoginError('Trop de tentatives de connexion. Attendez quelques minutes avant de réessayer.')
+          errorMessage = 'Trop de tentatives de connexion. Attendez quelques minutes avant de réessayer.';
         } else if (error.message.includes('network') || error.message.includes('fetch')) {
-          setLoginError('Problème de connexion internet. Vérifiez votre réseau et réessayez.')
+          errorMessage = 'Problème de connexion internet. Vérifiez votre réseau et réessayez.';
         } else {
-          setLoginError('Erreur de connexion. Veuillez réessayer plus tard.')
+          errorMessage = 'Erreur de connexion. Veuillez réessayer plus tard.';
         }
+        
+        // Mettre à jour l'état d'erreur
+        setLoginError(errorMessage)
+        
+        // Afficher également un toast pour plus de visibilité
+        Toast.show({
+          type: 'error',
+          text1: 'Échec de connexion',
+          text2: errorMessage,
+          visibilityTime: 4000,
+          position: 'top',
+        });
       } else if (data && data.user) {
         // Connexion réussie, afficher un Toast
         Toast.show({
@@ -98,7 +130,17 @@ const LoginScreen = ({ navigation, route }) => {
     } catch (error) {
       // Log pour les erreurs systèmes inattendues seulement
       console.log('Erreur système de connexion:', error.message)
-      setLoginError('Une erreur inattendue est survenue. Veuillez réessayer.')
+      const errorMessage = 'Une erreur inattendue est survenue. Veuillez réessayer.';
+      setLoginError(errorMessage);
+      
+      // Afficher un toast pour l'erreur
+      Toast.show({
+        type: 'error',
+        text1: 'Erreur système',
+        text2: errorMessage,
+        visibilityTime: 4000,
+        position: 'top',
+      });
     } finally {
       setLoading(false)
     }
@@ -107,8 +149,19 @@ const LoginScreen = ({ navigation, route }) => {
   // Fonction pour renvoyer l'email de confirmation
   const handleResendConfirmation = async () => {
     if (!email || !isValidEmail(email)) {
-      setLoginError('Veuillez entrer une adresse email valide pour renvoyer l\'email de confirmation.')
-      return
+      const errorMessage = 'Veuillez entrer une adresse email valide pour renvoyer l\'email de confirmation.';
+      setLoginError(errorMessage);
+      
+      // Afficher un toast pour plus de visibilité
+      Toast.show({
+        type: 'error',
+        text1: 'Format d\'email invalide',
+        text2: errorMessage,
+        visibilityTime: 4000,
+        position: 'top',
+      });
+      
+      return;
     }
     
     setLoading(true)
@@ -122,7 +175,17 @@ const LoginScreen = ({ navigation, route }) => {
       })
       
       if (error) {
-        setLoginError(error.message || 'Impossible de renvoyer l\'email de confirmation.')
+        const errorMessage = error.message || 'Impossible de renvoyer l\'email de confirmation.';
+        setLoginError(errorMessage);
+        
+        // Afficher un toast pour l'erreur
+        Toast.show({
+          type: 'error',
+          text1: 'Échec d\'envoi',
+          text2: errorMessage,
+          visibilityTime: 4000,
+          position: 'top',
+        });
       } else {
         Toast.show({
           type: 'success',
@@ -135,7 +198,17 @@ const LoginScreen = ({ navigation, route }) => {
       }
     } catch (error) {
       console.error('Resend confirmation error:', error)
-      setLoginError('Une erreur est survenue lors de l\'envoi de l\'email.')
+      const errorMessage = 'Une erreur est survenue lors de l\'envoi de l\'email.';
+      setLoginError(errorMessage);
+      
+      // Afficher un toast pour l'erreur
+      Toast.show({
+        type: 'error',
+        text1: 'Échec d\'envoi',
+        text2: errorMessage,
+        visibilityTime: 4000,
+        position: 'top',
+      });
     } finally {
       setLoading(false)
     }
@@ -149,8 +222,19 @@ const LoginScreen = ({ navigation, route }) => {
     }
 
     if (!isValidEmail(email)) {
-      setLoginError('Veuillez entrer une adresse email valide.')
-      return
+      const errorMessage = 'Veuillez entrer une adresse email valide.';
+      setLoginError(errorMessage);
+      
+      // Afficher un toast pour plus de visibilité
+      Toast.show({
+        type: 'error',
+        text1: 'Format d\'email invalide',
+        text2: errorMessage,
+        visibilityTime: 4000,
+        position: 'top',
+      });
+      
+      return;
     }
 
     setLoading(true)
@@ -162,7 +246,17 @@ const LoginScreen = ({ navigation, route }) => {
       })
       
       if (error) {
-        setLoginError(error.message || 'Impossible d\'envoyer l\'email de réinitialisation.')
+        const errorMessage = error.message || 'Impossible d\'envoyer l\'email de réinitialisation.';
+        setLoginError(errorMessage);
+        
+        // Afficher un toast pour l'erreur
+        Toast.show({
+          type: 'error',
+          text1: 'Échec de réinitialisation',
+          text2: errorMessage,
+          visibilityTime: 4000,
+          position: 'top',
+        });
       } else {
         Toast.show({
           type: 'success',
@@ -175,7 +269,17 @@ const LoginScreen = ({ navigation, route }) => {
       }
     } catch (error) {
       console.error('Password reset error:', error)
-      setLoginError('Une erreur est survenue lors de l\'envoi de l\'email.')
+      const errorMessage = 'Une erreur est survenue lors de l\'envoi de l\'email.';
+      setLoginError(errorMessage);
+      
+      // Afficher un toast pour l'erreur
+      Toast.show({
+        type: 'error',
+        text1: 'Erreur de réinitialisation',
+        text2: errorMessage,
+        visibilityTime: 4000,
+        position: 'top',
+      });
     } finally {
       setLoading(false)
     }
@@ -259,7 +363,7 @@ const LoginScreen = ({ navigation, route }) => {
             {/* Message d'erreur général */}
             {loginError ? (
               <View style={styles.errorContainer}>
-                <Ionicons name="alert-circle" size={16} color={COLORS.error} />
+                <Ionicons name="alert-circle" size={18} color={COLORS.error} />
                 <Text style={styles.errorText}>{loginError}</Text>
                 {loginError.includes('pas encore confirmé') && (
                   <TouchableOpacity 
@@ -388,12 +492,17 @@ const styles = StyleSheet.create({
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.error + '10',
+    backgroundColor: COLORS.error + '15',
     padding: SPACING.sm,
     borderRadius: BORDER_RADIUS.md,
     marginBottom: SPACING.md,
-    borderLeftWidth: 3,
+    borderLeftWidth: 4,
     borderLeftColor: COLORS.error,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
 
   errorText: {
@@ -401,6 +510,7 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     marginLeft: SPACING.xs,
     flex: 1,
+    fontWeight: '500',
   },
 
   resendButton: {

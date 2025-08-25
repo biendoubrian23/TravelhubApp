@@ -9,11 +9,13 @@ import {
   Alert,
   TextInput,
   Platform,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as LocalAuthentication from 'expo-local-authentication';
-import * as SecureStore from 'expo-secure-store';
+// Modules natifs temporairement désactivés
+// import * as LocalAuthentication from 'expo-local-authentication';
+// import * as SecureStore from 'expo-secure-store';
 import { Button } from '../../components';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
 import { useAuthStore } from '../../store';
@@ -33,134 +35,75 @@ const SecuritySettingsScreen = ({ navigation }) => {
     confirmPassword: '',
   });
 
-  const [loginAttempts, setLoginAttempts] = useState(0);
-  const [lastLoginTime, setLastLoginTime] = useState(null);
+  // États liés à l'historique de sécurité supprimés
 
   useEffect(() => {
-    checkBiometricSupport();
-    loadSecuritySettings();
-    loadSecurityLogs();
+    // Fonctions temporairement désactivées en raison de problèmes avec les modules natifs
+    // checkBiometricSupport();
+    // loadSecuritySettings();
+    // Fonction de chargement des logs de sécurité supprimée
+    
+    // Version simplifiée sans appels aux modules natifs
+    setBiometricAvailable(false);
+    setBiometricEnabled(false);
+    console.log('⚠️ Authentification biométrique temporairement désactivée');
   }, []);
 
   const checkBiometricSupport = async () => {
-    const compatible = await LocalAuthentication.hasHardwareAsync();
-    const enrolled = await LocalAuthentication.isEnrolledAsync();
-    setBiometricAvailable(compatible && enrolled);
-    
-    if (compatible && enrolled) {
-      // Charger l'état de la biométrie depuis le stockage sécurisé
-      const enabled = await SecureStore.getItemAsync('biometric_enabled');
-      setBiometricEnabled(enabled === 'true');
-    }
+    // Fonction simplifiée temporairement
+    console.log('⚠️ Vérification biométrique désactivée');
+    setBiometricAvailable(false);
   };
 
   const loadSecuritySettings = async () => {
-    try {
-      const twoFactor = await SecureStore.getItemAsync('two_factor_enabled');
-      const autoLock = await SecureStore.getItemAsync('auto_lock_enabled');
-      const lockTime = await SecureStore.getItemAsync('auto_lock_time');
-      
-      setTwoFactorEnabled(twoFactor === 'true');
-      setAutoLockEnabled(autoLock === 'true');
-      setAutoLockTime(lockTime ? parseInt(lockTime) : 5);
-    } catch (error) {
-      console.error('Erreur lors du chargement des paramètres de sécurité:', error);
-    }
+    // Fonction simplifiée temporairement
+    setTwoFactorEnabled(false);
+    setAutoLockEnabled(false);
+    setAutoLockTime(5);
+    console.log('⚠️ Chargement des paramètres de sécurité désactivé');
   };
 
-  const loadSecurityLogs = async () => {
-    try {
-      const attempts = await SecureStore.getItemAsync('failed_login_attempts');
-      const lastLogin = await SecureStore.getItemAsync('last_login_time');
-      
-      setLoginAttempts(attempts ? parseInt(attempts) : 0);
-      setLastLoginTime(lastLogin ? new Date(lastLogin) : null);
-    } catch (error) {
-      console.error('Erreur lors du chargement des logs de sécurité:', error);
-    }
-  };
+  // Fonction de chargement des logs de sécurité supprimée
 
   const toggleBiometric = async (enabled) => {
-    if (!biometricAvailable) {
-      Alert.alert(
-        'Non disponible',
-        'La biométrie n\'est pas disponible sur cet appareil ou aucune empreinte/face n\'est configurée.'
-      );
-      return;
-    }
-
-    if (enabled) {
-      // Demander l'authentification biométrique
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Confirmer avec votre empreinte ou visage',
-        disableDeviceFallback: true,
-      });
-
-      if (result.success) {
-        setBiometricEnabled(true);
-        await SecureStore.setItemAsync('biometric_enabled', 'true');
-        Alert.alert('Succès', 'L\'authentification biométrique a été activée');
-      } else {
-        Alert.alert('Échec', 'Impossible de configurer l\'authentification biométrique');
-      }
-    } else {
-      setBiometricEnabled(false);
-      await SecureStore.setItemAsync('biometric_enabled', 'false');
-      Alert.alert('Désactivé', 'L\'authentification biométrique a été désactivée');
-    }
+    // Fonction temporairement modifiée en raison de problèmes avec les modules natifs
+    Alert.alert(
+      'Fonctionnalité en maintenance',
+      'L\'authentification biométrique est temporairement indisponible. Nous travaillons à résoudre ce problème.'
+    );
+    
+    // Pour éviter tout problème, ne pas modifier l'état
+    setBiometricEnabled(false);
   };
 
   const toggleTwoFactor = async (enabled) => {
-    if (enabled) {
-      Alert.alert(
-        'Activer 2FA',
-        'Vous recevrez un code de vérification par SMS à chaque connexion. Continuer ?',
-        [
-          { text: 'Annuler', style: 'cancel' },
-          {
-            text: 'Activer',
-            onPress: async () => {
-              setTwoFactorEnabled(true);
-              await SecureStore.setItemAsync('two_factor_enabled', 'true');
-              // TODO: Configurer 2FA côté serveur
-            }
-          }
-        ]
-      );
-    } else {
-      Alert.alert(
-        'Désactiver 2FA',
-        'Votre compte sera moins sécurisé. Êtes-vous sûr ?',
-        [
-          { text: 'Annuler', style: 'cancel' },
-          {
-            text: 'Désactiver',
-            style: 'destructive',
-            onPress: async () => {
-              setTwoFactorEnabled(false);
-              await SecureStore.setItemAsync('two_factor_enabled', 'false');
-            }
-          }
-        ]
-      );
-    }
+    // Fonction temporairement modifiée en raison de problèmes avec les modules natifs
+    Alert.alert(
+      'Fonctionnalité en maintenance',
+      'L\'authentification à deux facteurs est temporairement indisponible. Nous travaillons à résoudre ce problème.'
+    );
+    
+    // Pour éviter tout problème, ne pas modifier l'état
+    setTwoFactorEnabled(false);
   };
 
   const toggleAutoLock = async (enabled) => {
+    // Fonction temporairement modifiée en raison de problèmes avec les modules natifs
     setAutoLockEnabled(enabled);
-    await SecureStore.setItemAsync('auto_lock_enabled', enabled.toString());
     
     if (enabled) {
       Alert.alert(
-        'Verrouillage automatique activé',
-        `L'application se verrouillera après ${autoLockTime} minutes d'inactivité`
+        'Fonctionnalité en maintenance',
+        'Le verrouillage automatique est temporairement indisponible. Nous travaillons à résoudre ce problème.'
       );
+      // Remettre le switch à off
+      setAutoLockEnabled(false);
     }
   };
 
   const changeAutoLockTime = async (time) => {
+    // Fonction temporairement modifiée en raison de problèmes avec les modules natifs
     setAutoLockTime(time);
-    await SecureStore.setItemAsync('auto_lock_time', time.toString());
   };
 
   const handleChangePassword = async () => {
@@ -189,44 +132,9 @@ const SecuritySettingsScreen = ({ navigation }) => {
     }
   };
 
-  const clearSecurityLogs = async () => {
-    Alert.alert(
-      'Effacer l\'historique',
-      'Voulez-vous effacer l\'historique de sécurité ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Effacer',
-          style: 'destructive',
-          onPress: async () => {
-            await SecureStore.deleteItemAsync('failed_login_attempts');
-            await SecureStore.deleteItemAsync('last_login_time');
-            setLoginAttempts(0);
-            setLastLoginTime(null);
-            Alert.alert('Succès', 'Historique de sécurité effacé');
-          }
-        }
-      ]
-    );
-  };
-
-  const logoutAllDevices = () => {
-    Alert.alert(
-      'Déconnexion partout',
-      'Cela vous déconnectera de tous vos appareils. Vous devrez vous reconnecter. Continuer ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Déconnecter',
-          style: 'destructive',
-          onPress: () => {
-            // TODO: Implémenter la déconnexion de tous les appareils
-            Alert.alert('Succès', 'Déconnecté de tous les appareils');
-          }
-        }
-      ]
-    );
-  };
+  // Fonction d'effacement de l'historique de sécurité supprimée
+  
+  // Fonction de déconnexion de tous les appareils supprimée
 
   const SecurityItem = ({ title, description, value, onToggle, icon, type = 'switch' }) => (
     <View style={styles.securityItem}>
@@ -273,11 +181,11 @@ const SecuritySettingsScreen = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Authentification</Text>
           
           <SecurityItem
-            title="Authentification biométrique"
-            description={biometricAvailable ? "Utiliser l'empreinte ou reconnaissance faciale" : "Non disponible sur cet appareil"}
+            title="Sécurité de l'appareil"
+            description={biometricAvailable ? "Utiliser le système de sécurité de l'appareil (empreinte, facial, code)" : "Aucun verrouillage d'écran configuré"}
             value={biometricEnabled}
             onToggle={toggleBiometric}
-            icon="finger-print"
+            icon="lock-closed"
           />
           
           <SecurityItem
@@ -383,49 +291,9 @@ const SecuritySettingsScreen = ({ navigation }) => {
           )}
         </View>
 
-        {/* Historique de sécurité */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Historique de sécurité</Text>
-          
-          <View style={styles.securityLog}>
-            <View style={styles.logItem}>
-              <Ionicons name="time" size={20} color={COLORS.primary} />
-              <View style={styles.logContent}>
-                <Text style={styles.logTitle}>Dernière connexion</Text>
-                <Text style={styles.logText}>
-                  {lastLoginTime ? lastLoginTime.toLocaleString('fr-FR') : 'Jamais connecté'}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.logItem}>
-              <Ionicons name="warning" size={20} color={loginAttempts > 0 ? COLORS.error : COLORS.success} />
-              <View style={styles.logContent}>
-                <Text style={styles.logTitle}>Tentatives de connexion échouées</Text>
-                <Text style={[styles.logText, loginAttempts > 0 && { color: COLORS.error }]}>
-                  {loginAttempts} tentative(s)
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity style={styles.clearButton} onPress={clearSecurityLogs}>
-              <Text style={styles.clearButtonText}>Effacer l'historique</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Actions de sécurité */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Actions de sécurité</Text>
-          
-          <TouchableOpacity style={styles.actionButton} onPress={logoutAllDevices}>
-            <Ionicons name="phone-portrait" size={20} color={COLORS.error} />
-            <Text style={[styles.actionButtonText, { color: COLORS.error }]}>
-              Se déconnecter de tous les appareils
-            </Text>
-            <Ionicons name="chevron-forward" size={20} color={COLORS.text.secondary} />
-          </TouchableOpacity>
-        </View>
+        {/* Section Historique de sécurité supprimée */}
+        
+        {/* Section Actions de sécurité supprimée */}
 
         {/* Conseils de sécurité */}
         <View style={styles.section}>
@@ -434,7 +302,7 @@ const SecuritySettingsScreen = ({ navigation }) => {
             <Text style={styles.tipItem}>• Utilisez un mot de passe unique et complexe</Text>
             <Text style={styles.tipItem}>• Activez l'authentification à deux facteurs</Text>
             <Text style={styles.tipItem}>• Ne partagez jamais vos informations de connexion</Text>
-            <Text style={styles.tipItem}>• Vérifiez régulièrement votre historique de connexion</Text>
+            <Text style={styles.tipItem}>• Utilisez une connexion sécurisée pour vous connecter</Text>
             <Text style={styles.tipItem}>• Déconnectez-vous sur les appareils publics</Text>
           </View>
         </View>
@@ -590,61 +458,9 @@ const styles = StyleSheet.create({
     color: COLORS.text.primary,
   },
   
-  securityLog: {
-    backgroundColor: COLORS.background,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-  },
+  // Styles pour l'historique de sécurité supprimés
   
-  logItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  
-  logContent: {
-    marginLeft: SPACING.md,
-    flex: 1,
-  },
-  
-  logTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.text.primary,
-    marginBottom: SPACING.xs,
-  },
-  
-  logText: {
-    fontSize: 14,
-    color: COLORS.text.secondary,
-  },
-  
-  clearButton: {
-    marginTop: SPACING.sm,
-    padding: SPACING.sm,
-    alignItems: 'center',
-  },
-  
-  clearButtonText: {
-    fontSize: 14,
-    color: COLORS.error,
-    fontWeight: '500',
-  },
-  
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.sm,
-    gap: SPACING.sm,
-  },
-  
-  actionButtonText: {
-    flex: 1,
-    fontSize: 16,
-    color: COLORS.text.primary,
-  },
+  // Styles pour les actions de sécurité supprimés
   
   tipsContainer: {
     backgroundColor: COLORS.background,

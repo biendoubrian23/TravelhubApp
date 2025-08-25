@@ -302,7 +302,7 @@ const ProfileScreen = ({ navigation }) => {
             icon="shield-checkmark"
             title="Sécurité"
             subtitle="Mot de passe, 2FA, biométrie"
-            onPress={() => Alert.alert('Bientôt disponible', 'Cette fonctionnalité sera disponible prochainement')}
+            onPress={() => navigation.navigate('SecuritySettings')}
           />
         </MenuSection>
 
