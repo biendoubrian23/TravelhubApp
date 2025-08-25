@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, RefreshControl, Alert, Dimensions } from 'react-native';
+import { View, ScrollView, RefreshControl, Alert, Dimensions, Modal, ActivityIndicator } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { 
   Text, 
@@ -27,12 +27,55 @@ try {
   console.log('⚠️ Service de facturation non disponible', error);
 }
 
+// Composant léger de chargement qui se ferme automatiquement après un délai
+const LoadingModal = ({ visible, message, timeout = 1000, onClose }) => {
+  useEffect(() => {
+    if (visible) {
+      const timer = setTimeout(() => {
+        if (onClose) onClose();
+      }, timeout);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [visible, timeout, onClose]);
+
+  return (
+    <Modal
+      transparent={true}
+      animationType="fade"
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <View style={{
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)'
+      }}>
+        <View style={{
+          backgroundColor: 'white',
+          borderRadius: 10,
+          padding: 20,
+          alignItems: 'center',
+          elevation: 5,
+          maxWidth: '80%'
+        }}>
+          <ActivityIndicator size="small" color={COLORS.primary} />
+          <Text style={{ marginTop: 10, textAlign: 'center' }}>{message}</Text>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 const BookingsScreen = ({ navigation: routeNavigation }) => {
   const { bookings, loadBookings, isLoading } = useBookingsStore();
   const { user } = useAuthStore();
   const navigation = useNavigation(); // Hook pour la navigation
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   
   // Styles communs pour les boutons d'action
   const screenWidth = Dimensions.get('window').width;
@@ -207,13 +250,9 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
     }
     
     try {
-      // Afficher un indicateur de chargement
-      Alert.alert(
-        "Chargement",
-        "Recherche de votre facture...",
-        [{ text: "Patienter" }],
-        { cancelable: false }
-      );
+      // Afficher l'indicateur de chargement léger
+      setLoadingMessage("Recherche de votre facture...");
+      setLoading(true);
       
       console.log('🔍 Recherche facture pour réservation:', booking.id, booking.booking_reference);
       
@@ -222,8 +261,14 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
       
       if (invoiceExists) {
         console.log('✅ Facture existante trouvée, récupération des détails');
+        // Mettre à jour le message de chargement
+        setLoadingMessage("Récupération de la facture...");
+        
         // Si une facture existe, la récupérer et l'afficher directement
         const invoice = await invoiceService.getInvoiceByBookingId(booking.id);
+        
+        // Masquer le chargement avant de naviguer
+        setLoading(false);
         
         if (invoice) {
           console.log('📄 Affichage facture existante:', invoice.invoice_number);
@@ -239,16 +284,14 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
       }
       
       console.log('⚠️ Aucune facture existante, création d\'une nouvelle');
-      // Montrer l'indicateur de chargement pour la création
-      Alert.alert(
-        "Création de facture",
-        "Création de votre facture en cours...",
-        [{ text: "OK" }],
-        { cancelable: false }
-      );
+      // Mettre à jour le message de chargement
+      setLoadingMessage("Création de votre facture en cours...");
       
       // Créer la facture en passant les données complètes de la réservation
       const invoice = await invoiceService.createInvoice(booking, user);
+      
+      // Masquer le chargement avant de naviguer
+      setLoading(false);
       
       if (invoice) {
         console.log('✅ Nouvelle facture créée:', invoice.invoice_number);
@@ -258,6 +301,8 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
         Alert.alert("Erreur", "Impossible de créer la facture. Veuillez réessayer.");
       }
     } catch (error) {
+      // Masquer le chargement en cas d'erreur
+      setLoading(false);
       console.error("❌ Erreur gestion facture:", error);
       Alert.alert("Erreur", "Une erreur est survenue lors de la gestion de la facture: " + error.message);
     }
@@ -483,6 +528,14 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
+      {/* Modal de chargement léger */}
+      <LoadingModal 
+        visible={loading}
+        message={loadingMessage}
+        timeout={1000}
+        onClose={() => setLoading(false)}
+      />
+      
       <View style={{ flex: 1, padding: SPACING.md }}>
         {/* Header */}
         <Text style={{ 
