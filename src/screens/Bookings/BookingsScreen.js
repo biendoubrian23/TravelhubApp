@@ -449,7 +449,7 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
               <View style={{ flex: 1 }}>
                 <Button 
                   mode="contained" 
-                  onPress={() => Alert.alert('E-Billet', 'Fonctionnalité de téléchargement bientôt disponible')}
+                  onPress={() => Alert.alert('E-Billet', 'Fonctionnalité de E-billet bientôt disponible')}
                   style={buttonStyle}
                   labelStyle={buttonLabelStyle}
                   contentStyle={{ height: 36 }}
