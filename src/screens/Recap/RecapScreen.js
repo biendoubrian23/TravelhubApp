@@ -55,24 +55,6 @@ const RecapScreen = ({ route, navigation }) => {
   const isRoundTrip = outboundTrip && returnTrip;
   const mainTrip = isRoundTrip ? outboundTrip : trip;
 
-  console.log('RecapScreen - Data received:', { 
-    trip, 
-    outboundTrip, 
-    returnTrip, 
-    selectedSeats, 
-    returnSelectedSeats,
-    totalPrice, 
-    isRoundTrip 
-  });
-
-  console.log('RecapScreen - VIP Status:', {
-    'outboundTrip?.is_vip': outboundTrip?.is_vip,
-    'returnTrip?.is_vip': returnTrip?.is_vip,
-    'trip?.is_vip': trip?.is_vip,
-    'selectedSeats length': selectedSeats?.length,
-    'returnSelectedSeats length': returnSelectedSeats?.length
-  });
-
   // Fonction pour calculer le nombre de passagers
   const getPassengerCount = () => {
     // Pour les trajets VIP, on utilise le nombre de sièges sélectionnés

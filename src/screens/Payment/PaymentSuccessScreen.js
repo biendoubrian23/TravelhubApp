@@ -29,18 +29,6 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
   } = route.params;
   const { user } = useAuthStore();
   
-  console.log('🎬 PaymentSuccessScreen - Paramètres reçus:');
-  console.log('- booking:', booking);
-  console.log('- trip:', trip);
-  console.log('- selectedSeats:', selectedSeats);
-  console.log('- totalPrice:', totalPrice);
-  console.log('- originalPrice:', originalPrice);
-  console.log('- referralDiscount:', referralDiscount);
-  console.log('- discountApplied:', discountApplied);
-  console.log('- rewardsToUse:', rewardsToUse);
-  console.log('- paymentMethod:', paymentMethod);
-  console.log('- user:', user);
-  
   // État pour éviter la création multiple de réservations avec une clé unique
   const tripId = trip?.id;
   const userId = user?.id;
@@ -114,14 +102,6 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
 
       try {
         // Préparer les données pour le service de réservation Supabase
-        console.log('🔍 DÉBOGAGE PaymentSuccessScreen:');
-        console.log('- trip:', trip);
-        console.log('- selectedSeats:', selectedSeats);
-        console.log('- selectedSeats type:', typeof selectedSeats);
-        console.log('- selectedSeats isArray:', Array.isArray(selectedSeats));
-        console.log('- user:', user);
-        console.log('- totalPrice:', totalPrice);
-        
         const bookingData = {
           tripId: trip?.id,
           userId: user?.id,
@@ -132,8 +112,6 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
           paymentMethod: paymentMethod || 'orange_money',
           selectedSeats: selectedSeats || []
         };
-
-        console.log('💾 Sauvegarde réservation en BD avec données préparées:', bookingData);
 
         // Utiliser createMultipleBookings pour créer une réservation par siège
         const savedBookings = await bookingService.createMultipleBookings(bookingData);
