@@ -61,7 +61,24 @@ const TripHistoryScreen = ({ navigation }) => {
     }
   };
 
-  const filteredBookings = bookings.filter(booking => {
+  // Dédupliquer les réservations d'abord
+  const uniqueBookings = bookings.reduce((unique, booking) => {
+    // Éviter les doublons basés sur l'ID ou la référence de réservation
+    const key = booking.bookingReference || booking.id;
+    const existing = unique.find(b => (b.bookingReference || b.id) === key);
+    
+    if (!existing) {
+      unique.push(booking);
+    } else if (booking.syncedWithDB && !existing.syncedWithDB) {
+      // Privilégier les réservations synchronisées avec la DB
+      const index = unique.findIndex(b => (b.bookingReference || b.id) === key);
+      unique[index] = booking;
+    }
+    
+    return unique;
+  }, []);
+
+  const filteredBookings = uniqueBookings.filter(booking => {
     if (filter === 'all') return true;
     return booking.status === filter;
   });
@@ -138,7 +155,12 @@ const TripHistoryScreen = ({ navigation }) => {
         <View style={styles.detailRow}>
           <View style={styles.detailItem}>
             <Ionicons name="person" size={16} color={COLORS.text.secondary} />
-            <Text style={styles.detailText}>Siège {booking.seatNumber}</Text>
+            <Text style={styles.detailText}>
+              {booking.multiSeat 
+                ? `Sièges ${booking.seatNumber}` 
+                : `Siège ${booking.seatNumber}`
+              }
+            </Text>
           </View>
           
           <View style={styles.detailItem}>
@@ -169,10 +191,10 @@ const TripHistoryScreen = ({ navigation }) => {
 
   const getFilterCounts = () => {
     return {
-      all: bookings.length,
-      completed: bookings.filter(b => b.status === 'completed').length,
-      upcoming: bookings.filter(b => b.status === 'upcoming').length,
-      cancelled: bookings.filter(b => b.status === 'cancelled').length,
+      all: uniqueBookings.length,
+      completed: uniqueBookings.filter(b => b.status === 'completed').length,
+      upcoming: uniqueBookings.filter(b => b.status === 'upcoming').length,
+      cancelled: uniqueBookings.filter(b => b.status === 'cancelled').length,
     };
   };
 

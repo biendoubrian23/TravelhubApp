@@ -24,6 +24,7 @@ const LoginScreen = ({ navigation, route }) => {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState({})
+  const [loginError, setLoginError] = useState('') // Message d'erreur général
   
   // Pré-remplir l'email si on arrive depuis la page d'inscription
   useEffect(() => {
@@ -51,54 +52,37 @@ const LoginScreen = ({ navigation, route }) => {
     return Object.keys(newErrors).length === 0
   }
 
+  // Fonction pour effacer les erreurs quand l'utilisateur tape
+  const clearErrors = () => {
+    if (loginError) setLoginError('')
+    if (Object.keys(errors).length > 0) setErrors({})
+  }
+
   const handleLogin = async () => {
     if (!validateForm()) return
 
     setLoading(true)
+    setLoginError('') // Reset previous errors
+    
     try {
-      const { data, error } = await signIn(email.trim().toLowerCase(), password)
+      const result = await signIn(email.trim().toLowerCase(), password)
+      const { data, error } = result || {}
       
       if (error) {
-        console.log('Auth error message:', error.message)
+        // Log simple pour le débogage
+        console.log('Tentative de connexion échouée:', error.message)
         
-        // Gestion détaillée des erreurs d'authentification
+        // Messages d'erreur simplifiés et clairs
         if (error.message.includes('Invalid login credentials')) {
-          Alert.alert(
-            'Échec de connexion', 
-            'Email ou mot de passe incorrect. Veuillez vérifier vos identifiants et réessayer.',
-            [{ text: 'OK', style: 'default' }]
-          )
+          setLoginError('Email ou mot de passe incorrect. Veuillez vérifier vos informations.')
         } else if (error.message.includes('Email not confirmed')) {
-          Alert.alert(
-            'Email non confirmé', 
-            'Votre compte n\'a pas encore été confirmé. Veuillez vérifier votre boîte mail (y compris les spams) et cliquer sur le lien de confirmation.',
-            [
-              { 
-                text: 'Renvoyer l\'email', 
-                onPress: () => handleResendConfirmation(),
-                style: 'default'
-              },
-              { text: 'OK', style: 'cancel' }
-            ]
-          )
-        } else if (error.message.includes('rate limit')) {
-          Alert.alert(
-            'Trop de tentatives', 
-            'Vous avez effectué trop de tentatives de connexion. Veuillez réessayer dans quelques minutes.',
-            [{ text: 'OK', style: 'default' }]
-          )
-        } else if (error.message.includes('network')) {
-          Alert.alert(
-            'Problème de réseau', 
-            'Impossible de se connecter au serveur. Veuillez vérifier votre connexion internet et réessayer.',
-            [{ text: 'OK', style: 'default' }]
-          )
+          setLoginError('Votre compte n\'est pas encore confirmé. Vérifiez votre email ou cliquez ci-dessous pour renvoyer l\'email de confirmation.')
+        } else if (error.message.includes('rate limit') || error.message.includes('too many')) {
+          setLoginError('Trop de tentatives de connexion. Attendez quelques minutes avant de réessayer.')
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          setLoginError('Problème de connexion internet. Vérifiez votre réseau et réessayez.')
         } else {
-          Alert.alert(
-            'Erreur de connexion', 
-            error.message || 'Une erreur inattendue est survenue lors de la connexion. Veuillez réessayer plus tard.',
-            [{ text: 'OK', style: 'default' }]
-          )
+          setLoginError('Erreur de connexion. Veuillez réessayer plus tard.')
         }
       } else if (data && data.user) {
         // Connexion réussie, afficher un Toast
@@ -109,14 +93,12 @@ const LoginScreen = ({ navigation, route }) => {
           visibilityTime: 3000,
           position: 'top',
         });
+        setLoginError('') // Clear any previous errors
       }
     } catch (error) {
-      Alert.alert(
-        'Erreur système', 
-        'Une erreur est survenue lors de la connexion. Veuillez réessayer plus tard.',
-        [{ text: 'OK', style: 'default' }]
-      )
-      console.error('Login error:', error)
+      // Log pour les erreurs systèmes inattendues seulement
+      console.log('Erreur système de connexion:', error.message)
+      setLoginError('Une erreur inattendue est survenue. Veuillez réessayer.')
     } finally {
       setLoading(false)
     }
@@ -125,11 +107,13 @@ const LoginScreen = ({ navigation, route }) => {
   // Fonction pour renvoyer l'email de confirmation
   const handleResendConfirmation = async () => {
     if (!email || !isValidEmail(email)) {
-      Alert.alert('Erreur', 'Veuillez entrer une adresse email valide')
+      setLoginError('Veuillez entrer une adresse email valide pour renvoyer l\'email de confirmation.')
       return
     }
     
     setLoading(true)
+    setLoginError('')
+    
     try {
       // Utilisation de l'API Supabase pour renvoyer l'email
       const { error } = await supabase.auth.resend({
@@ -138,16 +122,20 @@ const LoginScreen = ({ navigation, route }) => {
       })
       
       if (error) {
-        Alert.alert('Erreur', error.message || 'Impossible de renvoyer l\'email de confirmation')
+        setLoginError(error.message || 'Impossible de renvoyer l\'email de confirmation.')
       } else {
-        Alert.alert(
-          'Email envoyé',
-          'Un nouvel email de confirmation a été envoyé à votre adresse. Veuillez vérifier votre boîte de réception et vos spams.'
-        )
+        Toast.show({
+          type: 'success',
+          text1: 'Email envoyé',
+          text2: 'Vérifiez votre boîte de réception et vos spams.',
+          visibilityTime: 4000,
+          position: 'top',
+        });
+        setLoginError('')
       }
     } catch (error) {
       console.error('Resend confirmation error:', error)
-      Alert.alert('Erreur', 'Une erreur est survenue lors de l\'envoi de l\'email')
+      setLoginError('Une erreur est survenue lors de l\'envoi de l\'email.')
     } finally {
       setLoading(false)
     }
@@ -156,38 +144,38 @@ const LoginScreen = ({ navigation, route }) => {
   // Fonction pour gérer le mot de passe oublié
   const handleForgotPassword = async () => {
     if (!email) {
-      Alert.alert(
-        'Email requis', 
-        'Veuillez entrer votre adresse email ci-dessus pour réinitialiser votre mot de passe.'
-      )
+      setLoginError('Veuillez entrer votre adresse email ci-dessus pour réinitialiser votre mot de passe.')
       return
     }
 
     if (!isValidEmail(email)) {
-      Alert.alert('Erreur', 'Veuillez entrer une adresse email valide')
+      setLoginError('Veuillez entrer une adresse email valide.')
       return
     }
 
     setLoading(true)
+    setLoginError('')
+    
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
         redirectTo: 'myapp://reset-password',
       })
       
       if (error) {
-        Alert.alert(
-          'Erreur', 
-          error.message || 'Impossible d\'envoyer l\'email de réinitialisation'
-        )
+        setLoginError(error.message || 'Impossible d\'envoyer l\'email de réinitialisation.')
       } else {
-        Alert.alert(
-          'Email envoyé',
-          'Un email de réinitialisation de mot de passe a été envoyé à votre adresse. Veuillez vérifier votre boîte de réception et vos spams.'
-        )
+        Toast.show({
+          type: 'success',
+          text1: 'Email envoyé',
+          text2: 'Vérifiez votre boîte de réception pour réinitialiser votre mot de passe.',
+          visibilityTime: 4000,
+          position: 'top',
+        });
+        setLoginError('')
       }
     } catch (error) {
       console.error('Password reset error:', error)
-      Alert.alert('Erreur', 'Une erreur est survenue lors de l\'envoi de l\'email')
+      setLoginError('Une erreur est survenue lors de l\'envoi de l\'email.')
     } finally {
       setLoading(false)
     }
@@ -195,7 +183,13 @@ const LoginScreen = ({ navigation, route }) => {
 
   const handleGoogleLogin = async () => {
     // TODO: Implémenter la connexion Google
-    Alert.alert('Info', 'Connexion Google bientôt disponible')
+    Toast.show({
+      type: 'info',
+      text1: 'Bientôt disponible',
+      text2: 'La connexion Google sera disponible dans une prochaine mise à jour.',
+      visibilityTime: 3000,
+      position: 'top',
+    });
   }
 
   return (
@@ -218,7 +212,10 @@ const LoginScreen = ({ navigation, route }) => {
             <Input
               label="Email"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(text) => {
+                setEmail(text)
+                clearErrors()
+              }}
               placeholder="votre@email.com"
               keyboardType="email-address"
               autoCapitalize="none"
@@ -230,7 +227,10 @@ const LoginScreen = ({ navigation, route }) => {
               <Input
                 label="Mot de passe"
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text) => {
+                  setPassword(text)
+                  clearErrors()
+                }}
                 placeholder="Votre mot de passe"
                 secureTextEntry={!showPassword}
                 error={errors.password}
@@ -255,6 +255,22 @@ const LoginScreen = ({ navigation, route }) => {
                 Mot de passe oublié ?
               </Text>
             </TouchableOpacity>
+
+            {/* Message d'erreur général */}
+            {loginError ? (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle" size={16} color={COLORS.error} />
+                <Text style={styles.errorText}>{loginError}</Text>
+                {loginError.includes('pas encore confirmé') && (
+                  <TouchableOpacity 
+                    style={styles.resendButton}
+                    onPress={handleResendConfirmation}
+                  >
+                    <Text style={styles.resendButtonText}>Renvoyer</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : null}
 
             <Button
               title="Se connecter"
@@ -367,6 +383,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.primary,
     fontWeight: '500',
+  },
+
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.error + '10',
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.md,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.error,
+  },
+
+  errorText: {
+    fontSize: 14,
+    color: COLORS.error,
+    marginLeft: SPACING.xs,
+    flex: 1,
+  },
+
+  resendButton: {
+    backgroundColor: COLORS.error,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.sm,
+    marginLeft: SPACING.xs,
+  },
+
+  resendButtonText: {
+    fontSize: 12,
+    color: COLORS.surface,
+    fontWeight: '600',
   },
 
   loginButton: {

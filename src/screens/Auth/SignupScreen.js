@@ -26,6 +26,7 @@ const SignupScreen = ({ navigation }) => {
     email: '',
     telephone: '+237', // Préremplir avec le code pays du Cameroun
     ville: '',
+    referralCode: '', // Nouveau champ pour le code de parrainage
     password: '',
     confirmPassword: ''
   })
@@ -90,6 +91,13 @@ const SignupScreen = ({ navigation }) => {
       newErrors.ville = 'La ville ne peut pas contenir de retours à la ligne'
     }
 
+    // Validation du code de parrainage (optionnel)
+    if (formData.referralCode.trim() && formData.referralCode.trim().length < 6) {
+      newErrors.referralCode = 'Le code de parrainage doit contenir au moins 6 caractères'
+    } else if (formData.referralCode.trim() && !/^[A-Z0-9]+$/.test(formData.referralCode.trim())) {
+      newErrors.referralCode = 'Le code ne peut contenir que des lettres majuscules et des chiffres'
+    }
+
     // Validation du mot de passe - sécurité renforcée
     if (!formData.password.trim()) {
       newErrors.password = 'Le mot de passe est requis'
@@ -120,7 +128,8 @@ const SignupScreen = ({ navigation }) => {
         prenom: formData.prenom.trim(),
         telephone: formData.telephone.trim(),
         ville: formData.ville.trim() || null,
-        full_name: `${formData.prenom.trim()} ${formData.nom.trim()}`
+        full_name: `${formData.prenom.trim()} ${formData.nom.trim()}`,
+        referred_by_code: formData.referralCode.trim() || null
       };
       
       console.log('🔍 Données du formulaire à envoyer:', userDataToSend);
@@ -272,6 +281,17 @@ const SignupScreen = ({ navigation }) => {
     }
   }
 
+  const handleReferralCodeChange = (text) => {
+    // Permettre uniquement les caractères alphanumériques et convertir en majuscules
+    const alphanumeric = text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+    setFormData(prev => ({ ...prev, referralCode: alphanumeric.slice(0, 10) })) // Limiter à 10 caractères max
+    
+    // Effacer l'erreur si le code devient valide
+    if (alphanumeric.length === 0 || (alphanumeric.length >= 6 && /^[A-Z0-9]+$/.test(alphanumeric))) {
+      setErrors(prev => ({ ...prev, referralCode: '' }));
+    }
+  }
+
   const handleForgotPassword = async () => {
     const email = formData.email.trim().toLowerCase()
     if (!email || !isValidEmail(email)) {
@@ -312,6 +332,8 @@ const SignupScreen = ({ navigation }) => {
       handlePhoneChange(value);
     } else if (['nom', 'prenom', 'ville'].includes(field)) {
       handleTextFieldChange(field, value);
+    } else if (field === 'referralCode') {
+      handleReferralCodeChange(value);
     } else {
       // Pour email et password, validation standard
       setFormData(prev => ({ ...prev, [field]: value }));
@@ -403,6 +425,18 @@ const SignupScreen = ({ navigation }) => {
                 maxLength={50}
                 error={errors.ville}
                 helperText="Votre ville de résidence"
+              />
+
+              <Input
+                label="Code de parrainage (optionnel)"
+                value={formData.referralCode}
+                onChangeText={handleReferralCodeChange}
+                placeholder="Ex: ABC123XYZ"
+                autoCapitalize="characters"
+                maxLength={10}
+                error={errors.referralCode}
+                helperText="Vous avez un code ? Bénéficiez de 500 FCFA de réduction !"
+                style={styles.referralInput}
               />
 
               <View style={styles.passwordContainer}>
@@ -589,6 +623,11 @@ const styles = StyleSheet.create({
 
   signupButton: {
     marginTop: SPACING.md,
+  },
+
+  referralInput: {
+    borderColor: COLORS.success,
+    backgroundColor: COLORS.success + '10',
   },
 
   footer: {

@@ -153,29 +153,8 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   const referFriend = async () => {
-    try {
-      const referralMessage = `🎉 Rejoignez-moi sur TravelHub ! 
-      
-Voyagez facilement au Cameroun avec l'app de transport la plus fiable. 
-
-✅ Réservation en ligne
-✅ Choix de siège
-✅ Paiement sécurisé
-✅ Support 24/7
-
-Téléchargez TravelHub dès maintenant et profitez de voyages confortables !
-
-👉 https://travelhub.cm/app
-
-Partagé par ${userProfile.fullName || 'un ami'} 😊`;
-      
-      await Share.share({
-        message: referralMessage,
-        title: 'Découvrez TravelHub - Transport au Cameroun',
-      });
-    } catch (error) {
-      console.error('Erreur lors du partage:', error);
-    }
+    // Naviguer vers l'écran de parrainage au lieu de partager directement
+    navigation.navigate('Referral');
   };
 
   const callSupport = () => {

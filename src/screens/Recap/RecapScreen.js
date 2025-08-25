@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../../components';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
 import { formatTime, formatPrice } from '../../utils/helpers';
+import { bookingService } from '../../services/bookingService';
+import { useAuthStore } from '../../store';
 
 const RecapScreen = ({ route, navigation }) => {
+  const { user } = useAuthStore();
   const { 
     trip, 
     outboundTrip, 
@@ -24,6 +27,29 @@ const RecapScreen = ({ route, navigation }) => {
     searchParams 
   } = route.params;
   const [loading, setLoading] = useState(false);
+  const [referralRewards, setReferralRewards] = useState({
+    hasDiscount: false,
+    discountAmount: 0,
+    finalPrice: totalPrice,
+    availableRewards: []
+  });
+
+  useEffect(() => {
+    checkReferralRewards();
+  }, []);
+
+  const checkReferralRewards = async () => {
+    if (!user?.id || !totalPrice) return;
+    
+    try {
+      console.log('🔍 Vérification des récompenses de parrainage...')
+      const rewardInfo = await bookingService.applyReferralDiscount(user.id, totalPrice);
+      setReferralRewards(rewardInfo);
+      console.log('💰 Récompenses récupérées:', rewardInfo)
+    } catch (error) {
+      console.error('Erreur lors de la vérification des récompenses:', error);
+    }
+  };
 
   // Déterminer si c'est un aller-retour
   const isRoundTrip = outboundTrip && returnTrip;
@@ -67,13 +93,31 @@ const RecapScreen = ({ route, navigation }) => {
   };
 
   const calculateTotalPrice = () => {
+    let basePrice;
     if (isRoundTrip) {
       const outboundPassengers = getPassengerCount();
       const returnPassengers = getReturnPassengerCount();
-      return (outboundTrip?.prix || 0) * outboundPassengers + (returnTrip?.prix || 0) * returnPassengers;
+      basePrice = (outboundTrip?.prix || 0) * outboundPassengers + (returnTrip?.prix || 0) * returnPassengers;
+    } else {
+      const passengers = getPassengerCount();
+      basePrice = (trip?.prix || totalPrice || 0) * passengers;
     }
-    const passengers = getPassengerCount();
-    return (trip?.prix || totalPrice || 0) * passengers;
+    
+    return basePrice;
+  };
+
+  const getOriginalPrice = () => {
+    return calculateTotalPrice();
+  };
+
+  const getFinalPrice = () => {
+    return referralRewards.finalPrice;
+  };
+
+  // Helper function pour formater les prix
+  const formatPrice = (price) => {
+    if (price === null || price === undefined || isNaN(price)) return '0';
+    return Number(price).toLocaleString();
   };
 
   const handlePayment = () => {
@@ -82,17 +126,38 @@ const RecapScreen = ({ route, navigation }) => {
       returnTrip,
       selectedSeats,
       returnSelectedSeats,
-      totalPrice: calculateTotalPrice(),
+      totalPrice: getFinalPrice(), // Prix final avec remise
+      originalPrice: getOriginalPrice(), // Prix original
+      referralDiscount: referralRewards.discountAmount,
+      discountApplied: referralRewards.hasDiscount,
+      rewardsToUse: referralRewards.availableRewards,
       isRoundTrip: true,
-      searchParams
+      searchParams,
+      userInfo: {
+        firstName: user?.first_name || '',
+        lastName: user?.last_name || '',
+        email: user?.email || '',
+        phone: user?.phone || ''
+      }
     } : {
       trip,
       selectedSeats,
-      totalPrice: calculateTotalPrice(),
-      isRoundTrip: false, // Ajouter explicitement isRoundTrip: false
-      searchParams
+      totalPrice: getFinalPrice(), // Prix final avec remise
+      originalPrice: getOriginalPrice(), // Prix original
+      referralDiscount: referralRewards.discountAmount,
+      discountApplied: referralRewards.hasDiscount,
+      rewardsToUse: referralRewards.availableRewards,
+      isRoundTrip: false,
+      searchParams,
+      userInfo: {
+        firstName: user?.first_name || '',
+        lastName: user?.last_name || '',
+        email: user?.email || '',
+        phone: user?.phone || ''
+      }
     };
 
+    console.log('📊 Données de paiement avec récompenses:', paymentData);
     navigation.navigate('Payment', paymentData);
   };
 
@@ -137,7 +202,7 @@ const RecapScreen = ({ route, navigation }) => {
                     {outboundTrip?.is_vip ? 'VIP' : 'CLASSIC'}
                   </Text>
                   <Text style={styles.price}>
-                    {((outboundTrip?.prix || 0) * getPassengerCount()).toLocaleString()} FCFA
+                    {formatPrice((outboundTrip?.prix || 0) * getPassengerCount())} FCFA
                   </Text>
                 </View>
               </View>
@@ -169,7 +234,7 @@ const RecapScreen = ({ route, navigation }) => {
                     {returnTrip?.is_vip ? 'VIP' : 'CLASSIC'}
                   </Text>
                   <Text style={styles.price}>
-                    {((returnTrip?.prix || 0) * getReturnPassengerCount()).toLocaleString()} FCFA
+                    {formatPrice((returnTrip?.prix || 0) * getReturnPassengerCount())} FCFA
                   </Text>
                 </View>
               </View>
@@ -202,7 +267,7 @@ const RecapScreen = ({ route, navigation }) => {
                   {trip?.is_vip ? 'VIP' : 'CLASSIC'}
                 </Text>
                 <Text style={styles.price}>
-                  {((trip?.prix || 0) * getPassengerCount()).toLocaleString()} FCFA
+                  {formatPrice((trip?.prix || 0) * getPassengerCount())} FCFA
                 </Text>
               </View>
             </View>
@@ -307,7 +372,7 @@ const RecapScreen = ({ route, navigation }) => {
                     Trajet aller ({getPassengerCount()} passager{getPassengerCount() > 1 ? 's' : ''})
                   </Text>
                   <Text style={styles.priceValue}>
-                    {((outboundTrip?.prix || 0) * getPassengerCount()).toLocaleString()} FCFA
+                    {formatPrice((outboundTrip?.prix || 0) * getPassengerCount())} FCFA
                   </Text>
                 </View>
                 <View style={styles.priceRow}>
@@ -315,7 +380,7 @@ const RecapScreen = ({ route, navigation }) => {
                     Trajet retour ({getReturnPassengerCount()} passager{getReturnPassengerCount() > 1 ? 's' : ''})
                   </Text>
                   <Text style={styles.priceValue}>
-                    {((returnTrip?.prix || 0) * getReturnPassengerCount()).toLocaleString()} FCFA
+                    {formatPrice((returnTrip?.prix || 0) * getReturnPassengerCount())} FCFA
                   </Text>
                 </View>
               </>
@@ -325,19 +390,49 @@ const RecapScreen = ({ route, navigation }) => {
                   {getPassengerCount()} billet{getPassengerCount() > 1 ? 's' : ''} × {trip?.prix || 0} FCFA
                 </Text>
                 <Text style={styles.priceValue}>
-                  {(getPassengerCount() * (trip?.prix || 0)).toLocaleString()} FCFA
+                  {formatPrice(getPassengerCount() * (trip?.prix || 0))} FCFA
+                </Text>
+              </View>
+            )}
+            
+            {/* Récompenses de parrainage */}
+            {referralRewards.hasDiscount && (
+              <View style={styles.discountRow}>
+                <Text style={styles.discountLabel}>
+                  🎁 Récompense de parrainage ({referralRewards.availableRewards.length} récompense{referralRewards.availableRewards.length > 1 ? 's' : ''})
+                </Text>
+                <Text style={styles.discountValue}>
+                  -{formatPrice(referralRewards.discountAmount)} FCFA
                 </Text>
               </View>
             )}
             
             <View style={styles.divider} />
             
-            <View style={styles.priceRow}>
-              <Text style={styles.totalLabel}>Total à payer</Text>
-              <Text style={styles.totalValue}>
-                {calculateTotalPrice().toLocaleString()} FCFA
-              </Text>
-            </View>
+            {/* Section prix */}
+            {referralRewards.hasDiscount ? (
+              <>
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Sous-total</Text>
+                  <Text style={styles.priceValue}>
+                    {formatPrice(getOriginalPrice())} FCFA
+                  </Text>
+                </View>
+                <View style={styles.priceRow}>
+                  <Text style={styles.totalLabel}>Total à payer</Text>
+                  <Text style={styles.totalValue}>
+                    {formatPrice(getFinalPrice())} FCFA
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <View style={styles.priceRow}>
+                <Text style={styles.totalLabel}>Total à payer</Text>
+                <Text style={styles.totalValue}>
+                  {formatPrice(getFinalPrice())} FCFA
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -538,6 +633,56 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.primary,
+  },
+
+  discountedTotal: {
+    color: COLORS.success,
+  },
+
+  discountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+    backgroundColor: COLORS.success + '10',
+    paddingHorizontal: SPACING.sm,
+    borderRadius: BORDER_RADIUS.sm,
+    marginVertical: SPACING.xs,
+  },
+
+  discountInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  discountLabel: {
+    fontSize: 14,
+    color: COLORS.success,
+    fontWeight: '500',
+    marginLeft: SPACING.xs,
+  },
+
+  discountValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.success,
+  },
+
+  savingsMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.success + '10',
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.sm,
+    marginTop: SPACING.sm,
+  },
+
+  savingsText: {
+    marginLeft: SPACING.sm,
+    fontSize: 14,
+    color: COLORS.success,
+    fontWeight: '500',
+    flex: 1,
   },
   
   footer: {

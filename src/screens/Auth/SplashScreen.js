@@ -16,8 +16,16 @@ import { useAuthStore } from '../../store';
 
 const { width, height } = Dimensions.get('window');
 
-const SplashScreen = ({ navigation }) => {
+const SplashScreen = ({ navigation, route }) => {
   const { isAuthenticated, user } = useAuthStore();
+  const [shouldAutoNavigate, setShouldAutoNavigate] = React.useState(true);
+  
+  // Si on vient d'une connexion échouée, ne pas auto-naviguer
+  React.useEffect(() => {
+    if (route?.params?.fromFailedLogin) {
+      setShouldAutoNavigate(false);
+    }
+  }, [route?.params]);
   
   // Animations pour le bus
   const busPosition = useRef(new Animated.Value(-120)).current;
@@ -46,6 +54,15 @@ const SplashScreen = ({ navigation }) => {
 
   useEffect(() => {
     startAnimation();
+    
+    // Si l'utilisateur arrive sur SplashScreen depuis une autre page, naviguer immédiatement
+    if (route?.params?.quickNavigation) {
+      setTimeout(() => {
+        console.log('SplashScreen - Navigation rapide vers Login');
+        navigation.replace('Login', { userType: 'client' });
+      }, 1000); // Navigation plus rapide
+      return;
+    }
   }, []);
 
   const startAnimation = () => {
@@ -240,7 +257,11 @@ const SplashScreen = ({ navigation }) => {
 
     // Navigation conditionnelle basée sur l'état d'authentification
     setTimeout(() => {
-      if (isAuthenticated && user) {
+      if (!shouldAutoNavigate) {
+        // Si on ne doit pas auto-naviguer, aller directement au Login
+        console.log('SplashScreen - Navigation manuelle vers Login');
+        navigation.replace('Login', { userType: 'client' });
+      } else if (isAuthenticated && user) {
         console.log('SplashScreen - Utilisateur déjà connecté, navigation vers ClientMain');
         navigation.replace('ClientMain');
       } else {

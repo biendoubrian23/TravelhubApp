@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -38,6 +38,9 @@ import HelpSupportScreen from '../screens/Profile/HelpSupportScreen';
 // import AboutScreen from '../screens/Profile/AboutScreen';
 // import SecuritySettingsScreen from '../screens/Profile/SecuritySettingsScreen';
 import TripHistoryScreen from '../screens/TripHistory/TripHistoryScreen';
+
+// Referral Screens
+import ReferralScreen from '../screens/Referral/ReferralScreen';
 
 // Store
 import { useAuthStore } from '../store'
@@ -102,13 +105,18 @@ const ClientTabNavigator = () => {
 // Stack Navigator principal
 const AppNavigator = () => {
   const { user, isLoading, isAuthenticated, initialize } = useAuthStore()
+  const [hasInitialized, setHasInitialized] = React.useState(false)
 
   useEffect(() => {
-    initialize()
+    const init = async () => {
+      await initialize()
+      setHasInitialized(true)
+    }
+    init()
   }, [])
 
-  // Écran de chargement
-  if (isLoading) {
+  // Écran de chargement initial
+  if (isLoading || !hasInitialized) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -116,7 +124,12 @@ const AppNavigator = () => {
     )
   }
 
-  // Détermine la route initiale : Splash si pas authentifié, sinon ClientMain
+  console.log('🔍 AppNavigator - État auth:', { 
+    isAuthenticated, 
+    hasUser: !!user,
+    userEmail: user?.email 
+  });
+
   return (
     <NavigationContainer>
       <Stack.Navigator
@@ -124,96 +137,16 @@ const AppNavigator = () => {
           headerShown: false,
           cardStyle: { backgroundColor: COLORS.background },
         }}
-        initialRouteName={isAuthenticated ? 'ClientMain' : 'Splash'}
       >
-        {!isAuthenticated ? (
-          // Flux d'authentification (clients uniquement)
-          <>
-            <Stack.Screen 
-              name="Splash" 
-              component={SplashScreen}
-              options={{ gestureEnabled: false }}
-            />
-            <Stack.Screen 
-              name="Login" 
-              component={LoginScreen}
-            />
-            <Stack.Screen 
-              name="Signup" 
-              component={SignupScreen}
-            />
-            {/* Permettre l'accès à la recherche sans connexion */}
-            <Stack.Screen 
-              name="Home" 
-              component={HomeScreen}
-            />
-            <Stack.Screen 
-              name="Results" 
-              component={ResultsScreen}
-            />
-            <Stack.Screen 
-              name="Details" 
-              component={DetailsScreen}
-            />
-          </>
-        ) : (
-          // Interface client uniquement
+        {isAuthenticated && user ? (
+          // Interface utilisateur connecté
           <>
             <Stack.Screen 
               name="ClientMain" 
               component={ClientTabNavigator}
               options={{ headerShown: false }}
             />
-            <Stack.Screen 
-              name="Results" 
-              component={ResultsScreen}
-              options={{
-                presentation: 'card',
-                animationTypeForReplace: 'push',
-              }}
-            />
-            <Stack.Screen 
-              name="Details" 
-              component={DetailsScreen}
-              options={{
-                presentation: 'card',
-                animationTypeForReplace: 'push',
-              }}
-            />
-            <Stack.Screen 
-              name="SeatSelection" 
-              component={SeatSelectionScreen}
-              options={{
-                presentation: 'card',
-                animationTypeForReplace: 'push',
-              }}
-            />
-            <Stack.Screen 
-              name="Recap" 
-              component={RecapScreen}
-              options={{
-                presentation: 'card',
-                animationTypeForReplace: 'push',
-              }}
-            />
-            <Stack.Screen 
-              name="Payment" 
-              component={PaymentScreen}
-              options={{
-                presentation: 'card',
-                animationTypeForReplace: 'push',
-              }}
-            />
-            <Stack.Screen 
-              name="PaymentSuccess" 
-              component={PaymentSuccessScreen}
-              options={{
-                presentation: 'card',
-                animationTypeForReplace: 'push',
-                gestureEnabled: false, // Empêcher le retour par geste
-              }}
-            />
-
+            
             {/* Booking Screens */}
             <Stack.Screen 
               name="BookingDetails" 
@@ -263,67 +196,146 @@ const AppNavigator = () => {
               }}
             />
 
+            {/* Referral Screen */}
             <Stack.Screen 
-              name="RealtimeTest" 
-              component={RealtimeTestScreen}
+              name="Referral" 
+              component={ReferralScreen}
               options={{
-                title: '🧪 Test Realtime',
-                presentation: 'card',
-                animationTypeForReplace: 'push',
-              }}
-            />
-
-            <Stack.Screen 
-              name="RealDataTest" 
-              component={RealDataTestScreen}
-              options={{
-                title: '🗄️ Test Données Réelles',
-                presentation: 'card',
-                animationTypeForReplace: 'push',
-              }}
-            />
-
-            <Stack.Screen 
-              name="DatabaseTest" 
-              component={DatabaseTestScreen}
-              options={{
-                title: '🗄️ Test Base de Données',
-                presentation: 'card',
-                animationTypeForReplace: 'push',
-              }}
-            />
-
-            <Stack.Screen 
-              name="VipSeatDisplay" 
-              component={VipSeatDisplayScreen}
-              options={{
-                title: '🚌 Plan Sièges VIP',
-                presentation: 'card',
-                animationTypeForReplace: 'push',
-              }}
-            />
-
-            <Stack.Screen 
-              name="ReservationTest" 
-              component={ReservationTestScreen}
-              options={{
-                title: '🧪 Test Réservations',
-                presentation: 'card',
-                animationTypeForReplace: 'push',
-              }}
-            />
-
-            <Stack.Screen 
-              name="UserDataTest" 
-              component={UserDataTestScreen}
-              options={{
-                title: '👤 Test Données Utilisateur',
+                title: 'Parrainage',
                 presentation: 'card',
                 animationTypeForReplace: 'push',
               }}
             />
           </>
+        ) : (
+          // Interface utilisateur non connecté
+          <>
+            <Stack.Screen 
+              name="Splash" 
+              component={SplashScreen}
+              options={{ gestureEnabled: false }}
+            />
+            <Stack.Screen 
+              name="Login" 
+              component={LoginScreen}
+            />
+            <Stack.Screen 
+              name="Signup" 
+              component={SignupScreen}
+            />
+          </>
         )}
+        
+        {/* Écrans accessibles dans tous les cas */}
+        <Stack.Screen 
+          name="Home" 
+          component={HomeScreen}
+        />
+        <Stack.Screen 
+          name="Results" 
+          component={ResultsScreen}
+          options={{
+            presentation: 'card',
+            animationTypeForReplace: 'push',
+          }}
+        />
+        <Stack.Screen 
+          name="Details" 
+          component={DetailsScreen}
+          options={{
+            presentation: 'card',
+            animationTypeForReplace: 'push',
+          }}
+        />
+        <Stack.Screen 
+          name="SeatSelection" 
+          component={SeatSelectionScreen}
+          options={{
+            presentation: 'card',
+            animationTypeForReplace: 'push',
+          }}
+        />
+        <Stack.Screen 
+          name="Recap" 
+          component={RecapScreen}
+          options={{
+            presentation: 'card',
+            animationTypeForReplace: 'push',
+          }}
+        />
+        <Stack.Screen 
+          name="Payment" 
+          component={PaymentScreen}
+          options={{
+            presentation: 'card',
+            animationTypeForReplace: 'push',
+          }}
+        />
+        <Stack.Screen 
+          name="PaymentSuccess" 
+          component={PaymentSuccessScreen}
+          options={{
+            presentation: 'card',
+            animationTypeForReplace: 'push',
+            gestureEnabled: false, // Empêcher le retour par geste
+          }}
+        />
+
+        {/* Test Screens */}
+        <Stack.Screen 
+          name="RealtimeTest" 
+          component={RealtimeTestScreen}
+          options={{
+            title: '🧪 Test Realtime',
+            presentation: 'card',
+            animationTypeForReplace: 'push',
+          }}
+        />
+        <Stack.Screen 
+          name="RealDataTest" 
+          component={RealDataTestScreen}
+          options={{
+            title: '🗄️ Test Données Réelles',
+            presentation: 'card',
+            animationTypeForReplace: 'push',
+          }}
+        />
+        <Stack.Screen 
+          name="DatabaseTest" 
+          component={DatabaseTestScreen}
+          options={{
+            title: '🗄️ Test Base de Données',
+            presentation: 'card',
+            animationTypeForReplace: 'push',
+          }}
+        />
+        <Stack.Screen 
+          name="VipSeatDisplay" 
+          component={VipSeatDisplayScreen}
+          options={{
+            title: '🚌 Plan Sièges VIP',
+            presentation: 'card',
+            animationTypeForReplace: 'push',
+          }}
+        />
+        <Stack.Screen 
+          name="ReservationTest" 
+          component={ReservationTestScreen}
+          options={{
+            title: '🧪 Test Réservations',
+            presentation: 'card',
+            animationTypeForReplace: 'push',
+          }}
+        />
+        <Stack.Screen 
+          name="UserDataTest" 
+          component={UserDataTestScreen}
+          options={{
+            title: '👤 Test Données Utilisateur',
+            presentation: 'card',
+            animationTypeForReplace: 'push',
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   )

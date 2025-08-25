@@ -7,6 +7,7 @@ export const useAuthStore = create(devtools((set, get) => ({
   user: null,
   isLoading: false,
   isAuthenticated: false,
+  isSigningIn: false, // Flag pour indiquer qu'une connexion est en cours
 
   setUser: (user) => set({ 
     user, 
@@ -15,30 +16,48 @@ export const useAuthStore = create(devtools((set, get) => ({
 
   signOut: async () => {
     try {
+      console.log('🚪 Début de la déconnexion...');
+      
       // Importer Supabase
       const { supabase } = await import('../services/supabase')
       
       // Déconnecter de Supabase
+      console.log('🔄 Déconnexion de Supabase...');
       const { error } = await supabase.auth.signOut()
       
       if (error) {
-        console.error('Erreur lors de la déconnexion:', error)
+        console.error('❌ Erreur lors de la déconnexion Supabase:', error)
         // Même en cas d'erreur, nettoyer le store local
+      } else {
+        console.log('✅ Déconnexion Supabase réussie');
       }
       
       // Nettoyer le store
+      console.log('🧹 Nettoyage du store local...');
       set({ 
         user: null, 
-        isAuthenticated: false 
+        isAuthenticated: false,
+        isLoading: false,
+        isSigningIn: false
       })
       
-      console.log('Déconnexion réussie')
+      // Nettoyer aussi le store des réservations
+      const { useBookingsStore } = await import('./index')
+      useBookingsStore.setState({
+        bookings: [],
+        isLoading: false
+      })
+      
+      console.log('✅ Déconnexion complète réussie');
+      
     } catch (error) {
-      console.error('Erreur lors de la déconnexion:', error)
+      console.error('❌ Erreur lors de la déconnexion:', error)
       // Nettoyer le store même en cas d'erreur
       set({ 
         user: null, 
-        isAuthenticated: false 
+        isAuthenticated: false,
+        isLoading: false,
+        isSigningIn: false
       })
     }
   },
@@ -48,7 +67,7 @@ export const useAuthStore = create(devtools((set, get) => ({
   // Fonction de connexion
   signIn: async (email, password) => {
     try {
-      set({ isLoading: true })
+      set({ isLoading: true, isSigningIn: true })
       
       // Importer Supabase et authService
       const { supabase } = await import('../services/supabase')
@@ -60,9 +79,10 @@ export const useAuthStore = create(devtools((set, get) => ({
       const { data, error } = await authService.signIn(email, password)
       
       if (error) {
-        console.error('Erreur de connexion:', error)
-        set({ isLoading: false })
-        throw error
+        // Log simple pour le débogage, pas d'erreur
+        console.log('Connexion échouée pour:', email, '- Raison:', error.message)
+        set({ isLoading: false, isAuthenticated: false, user: null, isSigningIn: false })
+        return { data, error } // Retourner l'erreur sans throw
       }
       
       if (data?.user) {
@@ -70,17 +90,19 @@ export const useAuthStore = create(devtools((set, get) => ({
         set({ 
           user: data.user, 
           isAuthenticated: true, 
-          isLoading: false 
+          isLoading: false,
+          isSigningIn: false 
         })
         return { data, error: null }
       }
       
-      set({ isLoading: false })
+      set({ isLoading: false, isAuthenticated: false, user: null, isSigningIn: false })
       return { data, error }
     } catch (error) {
-      console.error('Erreur lors de la connexion:', error)
-      set({ isLoading: false })
-      throw error
+      // Log pour les erreurs système uniquement
+      console.log('Erreur système lors de la connexion:', error.message)
+      set({ isLoading: false, isAuthenticated: false, user: null, isSigningIn: false })
+      return { data: null, error }
     }
   },
 
@@ -151,11 +173,33 @@ export const useAuthStore = create(devtools((set, get) => ({
       supabase.auth.onAuthStateChange((event, session) => {
         console.log('Changement d\'état auth:', event, session?.user?.email || 'Aucun utilisateur')
         
-        if (session?.user) {
+        // Ne pas réagir aux changements d'état si on est en train de se connecter manuellement
+        const currentState = get()
+        if (currentState.isSigningIn) {
+          console.log('Connexion manuelle en cours, ignorer le changement d\'état auth')
+          return
+        }
+        
+        // Filtrer strictement les événements - ignorer INITIAL_SESSION complètement
+        if (event === 'INITIAL_SESSION') {
+          console.log('Événement INITIAL_SESSION ignoré pour éviter la navigation')
+          return
+        }
+        
+        // Ne réagir qu'aux événements de connexion/déconnexion réels
+        if (event === 'SIGNED_IN' && session?.user) {
+          // Vérifier si l'utilisateur est déjà connecté pour éviter les boucles
+          if (currentState.isAuthenticated && currentState.user?.id === session.user.id) {
+            console.log('Utilisateur déjà connecté, ignorer SIGNED_IN')
+            return
+          }
+          console.log('Utilisateur connecté avec succès via listener')
           set({ user: session.user, isAuthenticated: true })
-        } else {
+        } else if (event === 'SIGNED_OUT') {
+          console.log('Utilisateur déconnecté via listener')
           set({ user: null, isAuthenticated: false })
         }
+        // Tous les autres événements sont ignorés
       })
       
     } catch (error) {
@@ -270,8 +314,8 @@ export const useBookingsStore = create(devtools((set, get) => ({
           userId: user.id,
           seatNumber: booking.seatNumber,
           // Ne plus passer les infos génériques - le service les récupérera depuis la table users
-          totalPrice: booking.price || booking.totalPrice || 0,
-          paymentMethod: booking.paymentMethod || 'orange_money',
+          totalPrice: booking.total_price_fcfa || booking.price || booking.totalPrice || 0,
+          paymentMethod: booking.paymentMethod || booking.payment_method || 'orange_money',
           selectedSeats: booking.selectedSeats // Pour les sièges VIP
         }
         
@@ -331,44 +375,73 @@ export const useBookingsStore = create(devtools((set, get) => ({
           console.log('✅ Réservations récupérées depuis Supabase:', data);
           
           if (data && data.length > 0) {
-            // Transformer les données Supabase au format attendu avec protection
-            const transformedBookings = data.map(booking => {
-              // Protection contre les relations manquantes
+            console.log('📋 Données brutes de Supabase:', data.length, 'réservations');
+            
+            // Grouper les réservations par référence de réservation pour éviter les doublons visuels
+            const groupedBookings = data.reduce((groups, booking) => {
               const trip = booking.trips || {};
               const agency = trip.agencies || {};
+              const bookingRef = booking.booking_reference || booking.id;
               
-              console.log('🔄 Transformation booking:', {
-                bookingId: booking.id,
-                trip: trip,
+              if (!groups[bookingRef]) {
+                groups[bookingRef] = {
+                  bookings: [],
+                  trip: trip,
+                  agency: agency
+                };
+              }
+              
+              groups[bookingRef].bookings.push(booking);
+              return groups;
+            }, {});
+            
+            console.log('� Groupes de réservations:', Object.keys(groupedBookings).length);
+            
+            // Transformer chaque groupe en une seule entrée UI
+            const transformedBookings = Object.entries(groupedBookings).map(([bookingRef, group]) => {
+              const firstBooking = group.bookings[0];
+              const trip = group.trip;
+              const agency = group.agency;
+              
+              // Calculer le prix total et combiner les numéros de siège
+              const totalPrice = group.bookings.reduce((sum, b) => sum + (b.total_price_fcfa || 0), 0);
+              const seatNumbers = group.bookings.map(b => b.seat_number).filter(s => s).sort((a, b) => a - b);
+              const seatDisplay = seatNumbers.length > 1 ? `${seatNumbers.join(', ')}` : seatNumbers[0] || 'N/A';
+              
+              console.log('🔄 Transformation groupe:', {
+                bookingRef: bookingRef,
+                nbSieges: group.bookings.length,
+                sieges: seatNumbers,
+                prixTotal: totalPrice,
                 ville_depart: trip.ville_depart,
-                ville_arrivee: trip.ville_arrivee,
-                date: trip.date,
-                heure_dep: trip.heure_dep,
-                agency: agency
+                ville_arrivee: trip.ville_arrivee
               });
               
               return {
-                id: booking.id,
+                id: firstBooking.id,
                 departure: trip.ville_depart || 'Ville inconnue',
                 arrival: trip.ville_arrivee || 'Ville inconnue', 
                 date: trip.date || new Date().toISOString().split('T')[0],
                 time: trip.heure_dep || '00:00',
-                price: booking.total_price_fcfa || 0,
-                status: booking.booking_status === 'confirmed' ? 'upcoming' : (booking.booking_status || 'pending'),
+                price: totalPrice,
+                status: firstBooking.booking_status === 'confirmed' ? 'upcoming' : (firstBooking.booking_status || 'pending'),
                 busType: trip.bus_type || 'standard',
                 agency: agency.nom || 'TravelHub',
-                seatNumber: booking.seat_number || 'N/A',
-                bookingDate: booking.created_at,
-                bookingReference: booking.booking_reference || booking.id,
-                passengerName: booking.passenger_name || 'Nom non défini',
-                passengerPhone: booking.passenger_phone || 'Non défini',
-                paymentMethod: booking.payment_method || 'Non spécifié',
-                paymentStatus: booking.payment_status || 'pending',
+                seatNumber: seatDisplay,
+                seatNumbers: seatNumbers, // Array des numéros de siège
+                bookingDate: firstBooking.created_at,
+                bookingReference: bookingRef,
+                passengerName: firstBooking.passenger_name || 'Nom non défini',
+                passengerPhone: firstBooking.passenger_phone || 'Non défini',
+                paymentMethod: firstBooking.payment_method || 'Non spécifié',
+                paymentStatus: firstBooking.payment_status || 'pending',
                 // Informations du trajet pour affichage détaillé
                 trip: trip,
-                trip_id: booking.trip_id,
-                supabaseId: booking.id, // ID de la BD
-                syncedWithDB: true
+                trip_id: firstBooking.trip_id,
+                supabaseId: firstBooking.id, // ID de la BD
+                syncedWithDB: true,
+                multiSeat: group.bookings.length > 1, // Indicateur multi-sièges
+                allBookingIds: group.bookings.map(b => b.id) // Tous les IDs de réservation
               };
             }).filter(booking => booking.id); // Filtrer les réservations sans ID
             

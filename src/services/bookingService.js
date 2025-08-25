@@ -1,6 +1,33 @@
 import { supabase } from './supabaseClient'
 
 export const bookingService = {
+  // Vérifier et appliquer le discount de parrainage
+  async checkReferralDiscount(userId) {
+    try {
+      // Vérifier si l'utilisateur a été parrainé
+      const { data: referralData, error: referralError } = await supabase
+        .from('referrals')
+        .select('*')
+        .eq('referred_id', userId)
+        .single()
+
+      if (referralError || !referralData) {
+        console.log('👤 Aucun parrainage trouvé pour cet utilisateur')
+        return { hasDiscount: false, discount: 0 }
+      }
+
+      // NOTE: Dans notre système, seul le PARRAIN reçoit 500 FCFA, pas le filleul
+      // Le filleul n'a aucune réduction, c'est juste pour aider le parrain à gagner
+      console.log('� Utilisateur parrainé trouvé, mais aucune réduction pour le filleul')
+      console.log('💰 Le parrain recevra 500 FCFA après la première réservation du filleul')
+      
+      return { hasDiscount: false, discount: 0, referralId: referralData.id }
+    } catch (error) {
+      console.error('Erreur lors de la vérification du parrainage:', error)
+      return { hasDiscount: false, discount: 0 }
+    }
+  },
+
   // Créer plusieurs réservations (une par siège)
   async createMultipleBookings(bookingData) {
     try {
@@ -51,13 +78,24 @@ export const bookingService = {
       let finalSeatNumbers = [];
       
       // Gérer l'attribution des sièges
+      console.log('🪑 Analyse des sièges reçus:');
+      console.log('- selectedSeats:', bookingData.selectedSeats);
+      console.log('- seatNumber:', bookingData.seatNumber);
+      console.log('- Type selectedSeats:', typeof bookingData.selectedSeats);
+      console.log('- Est array:', Array.isArray(bookingData.selectedSeats));
+      
       if (bookingData.selectedSeats && Array.isArray(bookingData.selectedSeats)) {
-        finalSeatNumbers = bookingData.selectedSeats.map(seat => 
-          typeof seat === 'object' ? seat.seat_number || seat.number : seat
-        );
+        console.log('📋 Traitement sièges VIP array...');
+        finalSeatNumbers = bookingData.selectedSeats.map(seat => {
+          const seatNumber = typeof seat === 'object' ? seat.seat_number || seat.number : seat;
+          console.log('- Siège mappé:', seat, '→', seatNumber);
+          return seatNumber;
+        });
       } else if (bookingData.seatNumber) {
+        console.log('📋 Traitement siège unique...');
         finalSeatNumbers = [bookingData.seatNumber];
       } else {
+        console.log('📋 Attribution automatique pour trajets non-VIP...');
         // Attribution automatique pour trajets non-VIP
         const { busService } = await import('./busService');
         const numberOfSeats = bookingData.passengers || 1;
@@ -96,19 +134,27 @@ export const bookingService = {
 
       console.log(`✅ Sièges ${finalSeatNumbers.join(', ')} marqués comme occupés`);
 
+      // Vérifier le parrainage pour récompenser le parrain (pas de réduction pour le filleul)
+      const referralInfo = await this.checkReferralDiscount(bookingData.userId);
+      console.log('💰 Informations de parrainage:', referralInfo);
+
       // Créer une réservation pour chaque siège
       const createdBookings = [];
       const basePrice = bookingData.totalPrice ? Math.floor(bookingData.totalPrice / finalSeatNumbers.length) : 0;
       
       for (let i = 0; i < finalSeatNumbers.length; i++) {
         const seatNumber = finalSeatNumbers[i];
+        
         const reservationData = {
           trip_id: bookingData.tripId,
           user_id: bookingData.userId,
           seat_number: seatNumber, // UN SEUL siège par réservation
           passenger_name: userData.full_name || 'Client TravelHub',
           passenger_phone: userData.phone || '+237600000000',
-          total_price_fcfa: basePrice,
+          total_price_fcfa: basePrice, // Pas de réduction pour le filleul
+          original_price: basePrice, // Prix original avant réduction
+          applied_discount: 0, // Pas de réduction pour le filleul
+          discount_type: null, // Pas de type de réduction
           booking_reference: `TH${Date.now()}-${i + 1}`, // Référence unique pour chaque réservation
           booking_status: 'confirmed',
           payment_status: 'pending',
@@ -136,6 +182,11 @@ export const bookingService = {
 
         createdBookings.push(data);
         console.log(`✅ Réservation créée pour siège ${seatNumber}:`, data.id);
+      }
+
+      // Si l'utilisateur a été parrainé, créer la récompense pour le parrain
+      if (referralInfo.referralId) {
+        await this.createReferralReward(referralInfo.referralId, bookingData.userId, 500);
       }
 
       console.log('=== FIN CRÉATION RÉSERVATIONS MULTIPLES ===');
@@ -786,6 +837,189 @@ export const bookingService = {
       
     } catch (error) {
       console.error('Erreur lors de la création des données de test:', error);
+    }
+  },
+
+  // Créer une récompense de parrainage
+  async createReferralReward(referralId, referredUserId, amount) {
+    try {
+      console.log(`🔍 Vérification récompense parrainage pour referralId: ${referralId}`)
+      
+      // Récupérer les informations du parrainage
+      const { data: referralData, error: referralError } = await supabase
+        .from('referrals')
+        .select('referrer_id, status')
+        .eq('id', referralId)
+        .single()
+
+      if (referralError || !referralData) {
+        console.error('Impossible de trouver le parrainage:', referralError)
+        return
+      }
+
+      // ⚠️ IMPORTANT : Vérifier que c'est la PREMIÈRE réservation de l'ami parrainé
+      const { data: existingBookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('user_id', referredUserId)
+
+      if (bookingsError) {
+        console.error('Erreur lors de la vérification des réservations:', bookingsError)
+        return
+      }
+
+      const bookingCount = existingBookings ? existingBookings.length : 0
+      console.log(`📊 Nombre de réservations pour l'utilisateur ${referredUserId}: ${bookingCount}`)
+
+      // Si ce n'est PAS la première réservation, ne pas créer de récompense
+      if (bookingCount > 1) {
+        console.log('❌ Ce n\'est pas la première réservation - aucune récompense créée')
+        return
+      }
+
+      console.log('✅ C\'est la première réservation - création de la récompense')
+
+      // Créer la récompense pour le parrain (UNIQUEMENT)
+      const { data: reward, error: rewardError } = await supabase
+        .from('referral_rewards')
+        .insert({
+          referral_id: referralId,
+          referrer_id: referralData.referrer_id,
+          reward_amount: amount,
+          is_claimed: false,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+
+      if (rewardError) {
+        console.error('Erreur lors de la création de la récompense:', rewardError)
+        return
+      }
+
+      // 🆕 Marquer le parrainage comme complété et disponible
+      await supabase
+        .from('referrals')
+        .update({ 
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', referralId)
+
+      // 🆕 Mettre à jour les statistiques du parrain
+      // D'abord récupérer les valeurs actuelles
+      const { data: currentUser, error: getUserError } = await supabase
+        .from('users')
+        .select('total_referrals, total_referral_earnings')
+        .eq('id', referralData.referrer_id)
+        .single()
+
+      if (!getUserError && currentUser) {
+        const newTotalReferrals = (currentUser.total_referrals || 0) + 1
+        const newTotalEarnings = (currentUser.total_referral_earnings || 0) + amount
+
+        await supabase
+          .from('users')
+          .update({
+            total_referrals: newTotalReferrals,
+            total_referral_earnings: newTotalEarnings
+          })
+          .eq('id', referralData.referrer_id)
+
+        console.log(`📊 Statistiques mises à jour: ${newTotalReferrals} parrainages, ${newTotalEarnings} FCFA gagnés`)
+      }
+
+      console.log(`🎉 Récompense de ${amount} FCFA créée pour le parrain:`, reward)
+      return reward
+    } catch (error) {
+      console.error('Erreur lors de la création de la récompense de parrainage:', error)
+    }
+  },
+
+  // 🆕 Fonction pour récupérer les récompenses disponibles d'un utilisateur
+  async getAvailableRewards(userId) {
+    try {
+      const { data: rewards, error } = await supabase
+        .from('referral_rewards')
+        .select('*')
+        .eq('referrer_id', userId)
+        .eq('is_claimed', false)
+        .gte('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: true })
+
+      if (error) {
+        console.error('Erreur récupération récompenses:', error)
+        return []
+      }
+
+      const totalAmount = rewards?.reduce((sum, reward) => sum + reward.reward_amount, 0) || 0
+      console.log(`💰 Utilisateur ${userId} a ${rewards?.length || 0} récompenses disponibles pour ${totalAmount} FCFA`)
+      
+      return { rewards: rewards || [], totalAmount }
+    } catch (error) {
+      console.error('Erreur dans getAvailableRewards:', error)
+      return { rewards: [], totalAmount: 0 }
+    }
+  },
+
+  // 🆕 Fonction pour appliquer une réduction de parrainage
+  async applyReferralDiscount(userId, bookingAmount) {
+    try {
+      const { rewards, totalAmount } = await this.getAvailableRewards(userId)
+      
+      if (totalAmount === 0) {
+        return { hasDiscount: false, discountAmount: 0, finalPrice: bookingAmount }
+      }
+
+      // Appliquer la réduction (maximum = montant disponible)
+      const discountAmount = Math.min(totalAmount, bookingAmount)
+      const finalPrice = bookingAmount - discountAmount
+
+      console.log(`💰 Réduction appliquée: ${discountAmount} FCFA sur ${bookingAmount} FCFA`)
+      
+      return {
+        hasDiscount: true,
+        discountAmount,
+        finalPrice,
+        availableRewards: rewards
+      }
+    } catch (error) {
+      console.error('Erreur dans applyReferralDiscount:', error)
+      return { hasDiscount: false, discountAmount: 0, finalPrice: bookingAmount }
+    }
+  },
+
+  // 🆕 Fonction pour marquer les récompenses comme utilisées
+  async claimRewards(userId, usedAmount, bookingId) {
+    try {
+      const { rewards } = await this.getAvailableRewards(userId)
+      
+      let remainingAmount = usedAmount
+      const rewardsToUpdate = []
+
+      for (const reward of rewards) {
+        if (remainingAmount <= 0) break
+
+        const amountToUse = Math.min(reward.reward_amount, remainingAmount)
+        rewardsToUpdate.push(reward.id)
+        remainingAmount -= amountToUse
+
+        // Marquer comme utilisée
+        await supabase
+          .from('referral_rewards')
+          .update({
+            is_claimed: true,
+            claimed_at: new Date().toISOString(),
+            applied_to_booking_id: bookingId
+          })
+          .eq('id', reward.id)
+      }
+
+      console.log(`✅ ${rewardsToUpdate.length} récompenses marquées comme utilisées`)
+      return true
+    } catch (error) {
+      console.error('Erreur dans claimRewards:', error)
+      return false
     }
   }
 }

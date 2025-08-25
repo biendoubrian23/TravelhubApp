@@ -709,7 +709,7 @@ const SeatSelectionScreen = ({ route, navigation }) => {
             {maxSeats > 1 ? `Sélectionnez ${maxSeats} sièges pour ${maxSeats} passagers` : 'Sélectionnez votre siège'}
           </Text>
           <Text style={styles.summaryPrice}>
-            {isNaN(totalPrice) ? '0' : totalPrice.toLocaleString()} FCFA
+            {isNaN(totalPrice) || totalPrice === null || totalPrice === undefined ? '0' : Number(totalPrice).toLocaleString()} FCFA
           </Text>
         </View>
         

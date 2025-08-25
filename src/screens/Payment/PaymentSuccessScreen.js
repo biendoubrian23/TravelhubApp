@@ -13,25 +13,53 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../../components';
 import { useBookingsStore, useAuthStore } from '../../store';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
+import { bookingService } from '../../services';
 
 const PaymentSuccessScreen = ({ route, navigation }) => {
-  const { booking, trip, selectedSeats, totalPrice, paymentMethod } = route.params;
-  const { addBooking } = useBookingsStore();
+  const { 
+    booking, 
+    trip, 
+    selectedSeats, 
+    totalPrice, 
+    originalPrice,
+    referralDiscount,
+    discountApplied,
+    rewardsToUse,
+    paymentMethod 
+  } = route.params;
   const { user } = useAuthStore();
+  
+  console.log('🎬 PaymentSuccessScreen - Paramètres reçus:');
+  console.log('- booking:', booking);
+  console.log('- trip:', trip);
+  console.log('- selectedSeats:', selectedSeats);
+  console.log('- totalPrice:', totalPrice);
+  console.log('- originalPrice:', originalPrice);
+  console.log('- referralDiscount:', referralDiscount);
+  console.log('- discountApplied:', discountApplied);
+  console.log('- rewardsToUse:', rewardsToUse);
+  console.log('- paymentMethod:', paymentMethod);
+  console.log('- user:', user);
   
   // État pour éviter la création multiple de réservations avec une clé unique
   const tripId = trip?.id;
   const userId = user?.id;
-  const bookingKey = `${tripId}_${userId}`;
+  
+  // Inclure les sièges dans la clé pour éviter les conflits lors de réservations multiples
+  const seatNumbers = selectedSeats && Array.isArray(selectedSeats) 
+    ? selectedSeats.map(s => s.seat_number || s.number || s).sort().join('-')
+    : (typeof selectedSeats === 'string' ? selectedSeats : 'default');
+  
+  const bookingKey = `${tripId}_${userId}_${seatNumbers}_${Date.now()}`;
+  
+  console.log('🔑 Clé de réservation générée:', bookingKey);
   
   // Utiliser une Map globale pour éviter les doublons entre différentes instances
   if (!global.processedBookings) {
     global.processedBookings = new Map();
   }
   
-  const [bookingCreated, setBookingCreated] = useState(
-    global.processedBookings.has(bookingKey)
-  );
+  const [bookingCreated, setBookingCreated] = useState(false);
 
   // Animations
   const [checkAnimation] = useState(new Animated.Value(0));
@@ -62,61 +90,116 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
 
     const addBookingToHistory = async () => {
       // Vérifier si la réservation a déjà été créée pour éviter les doublons
-      if (bookingCreated || global.processedBookings.has(bookingKey)) {
-        console.log('🛑 Réservation déjà créée, pas de duplication pour:', bookingKey);
+      const existingEntry = global.processedBookings.get(bookingKey);
+      const now = Date.now();
+      
+      // Si l'entrée existe et qu'elle a moins de 5 minutes, on considère que c'est un doublon
+      if (existingEntry && (now - existingEntry) < 5 * 60 * 1000) {
+        console.log('🛑 Réservation déjà créée récemment, pas de duplication pour:', bookingKey);
         return;
+      }
+
+      // Nettoyer les anciennes entrées (plus de 5 minutes)
+      for (const [key, timestamp] of global.processedBookings.entries()) {
+        if (now - timestamp > 5 * 60 * 1000) {
+          global.processedBookings.delete(key);
+        }
       }
 
       // Marquer comme en cours de traitement immédiatement
       setBookingCreated(true);
-      global.processedBookings.set(bookingKey, Date.now());
+      global.processedBookings.set(bookingKey, now);
       
       console.log('🚀 Création de la réservation après confirmation de paiement pour:', bookingKey);
 
-      // Ajouter la réservation à l'historique et à Supabase
-      const currentDate = new Date();
-      const formattedDate = currentDate.toISOString().split('T')[0];
-      const formattedTime = currentDate.toTimeString().substring(0, 5);
-      
-      // Formatage correct des sièges
-      let formattedSeats = 'A1'; // Valeur par défaut
-      if (selectedSeats && Array.isArray(selectedSeats)) {
-        formattedSeats = selectedSeats.map(seat => {
-          if (typeof seat === 'object' && seat !== null) {
-            return seat.seat_number || seat.number || 'Siège';
-          }
-          return seat;
-        }).join(', ');
-      } else if (selectedSeats && typeof selectedSeats === 'string') {
-        formattedSeats = selectedSeats;
-      }
-
-      // Créer un objet de réservation avec toutes les vérifications pour éviter les erreurs
-      const newBooking = {
-        departure: trip?.departure_city || trip?.ville_depart || 'Départ',
-        arrival: trip?.arrival_city || trip?.ville_arrivee || 'Arrivée',
-        date: formattedDate, // Utiliser la date actuelle pour éviter les problèmes
-        time: formattedTime, // Utiliser l'heure actuelle pour éviter les problèmes
-        price: totalPrice || 0,
-        status: 'upcoming',
-        busType: trip?.bus_type || 'VIP',
-        agency: trip?.agency?.name || 'TravelHub',
-        seatNumber: formattedSeats,
-        selectedSeats: selectedSeats, // Ajouter les sièges sélectionnés
-        paymentMethod: paymentMethod || 'Paiement simulé',
-        duration: trip?.duration || '3h 30min',
-        trip: trip || {}, // Fournir un objet vide si trip est undefined
-        tripId: trip?.id || null, // Utiliser tripId au lieu de trip_id pour correspondre au service
-        totalPrice: totalPrice || 0 // Ajouter totalPrice pour le service
-      };
-
       try {
-        // Passer l'utilisateur pour sauvegarder dans Supabase si connecté
-        const savedBooking = await addBooking(newBooking, user);
-        console.log('✅ Réservation créée avec succès après paiement:', savedBooking);
-        console.log('📋 Nouvelle réservation:', JSON.stringify(newBooking, null, 2));
+        // Préparer les données pour le service de réservation Supabase
+        console.log('🔍 DÉBOGAGE PaymentSuccessScreen:');
+        console.log('- trip:', trip);
+        console.log('- selectedSeats:', selectedSeats);
+        console.log('- selectedSeats type:', typeof selectedSeats);
+        console.log('- selectedSeats isArray:', Array.isArray(selectedSeats));
+        console.log('- user:', user);
+        console.log('- totalPrice:', totalPrice);
+        
+        const bookingData = {
+          tripId: trip?.id,
+          userId: user?.id,
+          seatNumber: selectedSeats && Array.isArray(selectedSeats) 
+            ? selectedSeats.map(seat => seat.seat_number || seat.number || seat).join(', ')
+            : (typeof selectedSeats === 'string' ? selectedSeats : 'A1'),
+          totalPrice: totalPrice || 0,
+          paymentMethod: paymentMethod || 'orange_money',
+          selectedSeats: selectedSeats || []
+        };
+
+        console.log('💾 Sauvegarde réservation en BD avec données préparées:', bookingData);
+
+        // Utiliser createMultipleBookings pour créer une réservation par siège
+        const savedBookings = await bookingService.createMultipleBookings(bookingData);
+        
+        if (savedBookings && Array.isArray(savedBookings) && savedBookings.length > 0) {
+          console.log(`✅ ${savedBookings.length} réservations sauvegardées dans Supabase:`, savedBookings);
+          
+          // 🆕 MARQUER LES RÉCOMPENSES COMME UTILISÉES
+          if (rewardsToUse && Array.isArray(rewardsToUse) && rewardsToUse.length > 0 && referralDiscount > 0) {
+            console.log('💰 Marquage des récompenses de parrainage comme utilisées...');
+            console.log('- Récompenses à marquer:', rewardsToUse);
+            console.log('- Montant utilisé:', referralDiscount);
+            
+            try {
+              const firstBookingId = savedBookings[0]?.id;
+              const claimResult = await bookingService.claimRewards(user.id, referralDiscount, firstBookingId);
+              
+              if (claimResult) {
+                console.log('✅ Récompenses marquées comme utilisées avec succès');
+              } else {
+                console.error('❌ Échec du marquage des récompenses');
+              }
+            } catch (claimError) {
+              console.error('❌ Erreur lors du marquage des récompenses:', claimError);
+            }
+          }
+          
+          // CORRECTION : Créer UNE SEULE entrée locale pour toutes les réservations de ce groupe
+          // au lieu d'une entrée par siège (pour éviter les doublons visuels)
+          const allSeatNumbers = savedBookings.map(booking => booking.seat_number).join(', ');
+          const firstBooking = savedBookings[0]; // Prendre la première pour les infos générales
+          
+          const localBooking = {
+            id: firstBooking.booking_reference,
+            booking_reference: firstBooking.booking_reference,
+            departure: trip?.departure_city || 'Départ',
+            arrival: trip?.arrival_city || 'Arrivée',
+            date: trip?.departure_date || new Date().toISOString().split('T')[0],
+            time: trip?.departure_time || new Date().toTimeString().substring(0, 5),
+            price: totalPrice || 0, // Prix total pour le groupe
+            status: 'upcoming',
+            busType: trip?.bus_type || 'VIP',
+            agency: trip?.agency?.name || 'TravelHub',
+            seatNumber: allSeatNumbers, // Tous les sièges séparés par virgule
+            selectedSeats: selectedSeats,
+            paymentMethod: paymentMethod || 'orange_money',
+            duration: trip?.duration || '3h 30min',
+            trip: trip || {},
+            tripId: trip?.id,
+            totalPrice: totalPrice || 0,
+            bookingDate: new Date().toISOString().split('T')[0],
+            // Ajouter les références de toutes les réservations individuelles
+            supabaseBookings: savedBookings
+          };
+          
+          // Ajouter UNE SEULE entrée au store local
+          useBookingsStore.setState(state => ({
+            bookings: [localBooking, ...state.bookings]
+          }));
+          
+          console.log('✅ Réservation groupée ajoutée au store local:', localBooking);
+        } else {
+          console.warn('⚠️ Aucune réservation retournée par le service');
+        }
       } catch (error) {
-        console.error('❌ Erreur lors de l\'ajout de la réservation:', error);
+        console.error('❌ Erreur lors de la création de la réservation:', error);
         // En cas d'erreur, permettre un nouvel essai
         setBookingCreated(false);
         global.processedBookings.delete(bookingKey);
@@ -125,6 +208,26 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
 
     addBookingToHistory();
   }, []);
+
+  // Fonction pour formater les prix de manière sécurisée
+  const formatPrice = (price) => {
+    if (price === null || price === undefined || isNaN(price)) {
+      return '0 FCFA';
+    }
+    
+    const numPrice = Number(price);
+    
+    if (isNaN(numPrice)) {
+      return '0 FCFA';
+    }
+    
+    try {
+      return numPrice.toLocaleString('fr-FR') + ' FCFA';
+    } catch (error) {
+      console.warn('Erreur formatPrice:', error);
+      return numPrice.toString() + ' FCFA';
+    }
+  };
 
   const formatDateTime = (dateTime) => {
     if (!dateTime) {
@@ -309,9 +412,29 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
           <Text style={styles.sectionTitle}>Paiement</Text>
           
           <View style={styles.paymentInfo}>
+            {/* Afficher le prix original s'il y a eu une réduction */}
+            {originalPrice && originalPrice > totalPrice && (
+              <View style={styles.paymentRow}>
+                <Text style={styles.paymentLabel}>Prix original</Text>
+                <Text style={[styles.paymentAmount, styles.originalPrice]}>{formatPrice(originalPrice)}</Text>
+              </View>
+            )}
+            
+            {/* Afficher la réduction de parrainage */}
+            {referralDiscount && referralDiscount > 0 && (
+              <View style={styles.paymentRow}>
+                <Text style={[styles.paymentLabel, styles.discountLabel]}>
+                  🎁 Bonus de parrainage utilisé
+                </Text>
+                <Text style={[styles.paymentAmount, styles.discountAmount]}>
+                  -{formatPrice(referralDiscount)}
+                </Text>
+              </View>
+            )}
+            
             <View style={styles.paymentRow}>
-              <Text style={styles.paymentLabel}>Montant total</Text>
-              <Text style={styles.paymentAmount}>{totalPrice.toLocaleString()} FCFA</Text>
+              <Text style={styles.paymentLabel}>Montant payé</Text>
+              <Text style={styles.paymentAmount}>{formatPrice(totalPrice)}</Text>
             </View>
             
             <View style={styles.paymentStatus}>
@@ -320,6 +443,25 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
             </View>
           </View>
         </View>
+        
+        {/* Bonus de parrainage utilisé (si applicable) */}
+        {referralDiscount && referralDiscount > 0 && (
+          <View style={[styles.section, styles.bonusSection]}>
+            <View style={styles.bonusHeader}>
+              <Ionicons name="gift" size={24} color={COLORS.primary} />
+              <Text style={styles.bonusSectionTitle}>Bonus de parrainage utilisé</Text>
+            </View>
+            
+            <View style={styles.bonusInfo}>
+              <Text style={styles.bonusText}>
+                Félicitations ! Vous avez économisé {formatPrice(referralDiscount)} grâce à votre bonus de parrainage.
+              </Text>
+              <Text style={styles.bonusSubtext}>
+                Cette récompense a été automatiquement déduite de votre facture.
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Instructions importantes */}
         <View style={styles.section}>
@@ -559,6 +701,56 @@ const styles = StyleSheet.create({
     color: COLORS.success,
     marginLeft: SPACING.xs,
     fontWeight: '500',
+  },
+  
+  originalPrice: {
+    textDecorationLine: 'line-through',
+    color: COLORS.text.secondary,
+  },
+  
+  discountLabel: {
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  
+  discountAmount: {
+    color: COLORS.success,
+    fontWeight: 'bold',
+  },
+  
+  bonusSection: {
+    backgroundColor: COLORS.primary + '10',
+    borderColor: COLORS.primary,
+    borderWidth: 1,
+  },
+  
+  bonusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  
+  bonusSectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    marginLeft: SPACING.sm,
+  },
+  
+  bonusInfo: {
+    gap: SPACING.xs,
+  },
+  
+  bonusText: {
+    fontSize: 14,
+    color: COLORS.text.primary,
+    fontWeight: '500',
+  },
+  
+  bonusSubtext: {
+    fontSize: 12,
+    color: COLORS.text.secondary,
+    fontStyle: 'italic',
   },
   
   instructionsContainer: {

@@ -22,8 +22,13 @@ const PaymentScreen = ({ route, navigation }) => {
     selectedSeats, 
     returnSelectedSeats, 
     totalPrice, 
-    isRoundTrip = false, // Valeur par défaut
-    searchParams 
+    originalPrice,
+    referralDiscount = 0,
+    discountApplied = false,
+    rewardsToUse = [],
+    isRoundTrip = false,
+    searchParams,
+    userInfo 
   } = route.params;
   
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
@@ -45,10 +50,15 @@ const PaymentScreen = ({ route, navigation }) => {
       returnTrip, 
       selectedSeats, 
       returnSelectedSeats, 
-      totalPrice, 
+      totalPrice,
+      originalPrice,
+      referralDiscount,
+      discountApplied,
+      rewardsToUse,
       isRoundTrip,
-      searchParams 
-    });
+      searchParams,
+      userInfo
+    }); 
     console.log('PaymentScreen - selectedSeats details:', selectedSeats);
     console.log('PaymentScreen - returnSelectedSeats details:', returnSelectedSeats);
     console.log('PaymentScreen - selectedSeats length:', selectedSeats?.length);
@@ -56,6 +66,12 @@ const PaymentScreen = ({ route, navigation }) => {
     console.log('PaymentScreen - searchParams:', searchParams);
     console.log('PaymentScreen - isRoundTrip:', isRoundTrip);
   }, []); // Exécuter seulement au montage du composant
+
+  // Helper function pour formater les prix
+  const formatPrice = (price) => {
+    if (price === null || price === undefined || isNaN(price)) return '0';
+    return Number(price).toLocaleString();
+  };
 
   const paymentMethods = [
     {
@@ -122,6 +138,10 @@ const PaymentScreen = ({ route, navigation }) => {
           booking_status: 'confirmed',
           payment_status: 'completed',
           total_price_fcfa: totalPrice,
+          original_price_fcfa: originalPrice,
+          referral_discount_fcfa: referralDiscount,
+          discount_applied: discountApplied,
+          rewards_used: rewardsToUse,
           trip: trip,
           selectedSeats: selectedSeats,
           payment_method: selectedPaymentMethod === 'orange_money' ? 'orange_money' : 'mtn_momo'
@@ -134,6 +154,10 @@ const PaymentScreen = ({ route, navigation }) => {
           trip: trip,
           selectedSeats: selectedSeats,
           totalPrice: totalPrice,
+          originalPrice: originalPrice,
+          referralDiscount: referralDiscount,
+          discountApplied: discountApplied,
+          rewardsToUse: rewardsToUse,
           paymentMethod: mockBooking.payment_method
         });
         return;
@@ -149,6 +173,10 @@ const PaymentScreen = ({ route, navigation }) => {
         booking_status: 'confirmed',
         payment_status: 'completed',
         total_price_fcfa: totalPrice,
+        original_price_fcfa: originalPrice,
+        referral_discount_fcfa: referralDiscount,
+        discount_applied: discountApplied,
+        rewards_used: rewardsToUse,
         trip: trip,
         selectedSeats: selectedSeats,
         payment_method: 'stripe'
@@ -161,6 +189,10 @@ const PaymentScreen = ({ route, navigation }) => {
         trip: trip,
         selectedSeats: selectedSeats,
         totalPrice: totalPrice,
+        originalPrice: originalPrice,
+        referralDiscount: referralDiscount,
+        discountApplied: discountApplied,
+        rewardsToUse: rewardsToUse,
         paymentMethod: mockBooking.payment_method
       });
 
@@ -328,10 +360,30 @@ const PaymentScreen = ({ route, navigation }) => {
               </>
             )}
             
+            {/* Affichage des récompenses de parrainage */}
+            {discountApplied && (
+              <View style={styles.discountSection}>
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Sous-total</Text>
+                  <Text style={styles.priceValue}>
+                    {formatPrice(originalPrice)} FCFA
+                  </Text>
+                </View>
+                <View style={styles.discountRow}>
+                  <Text style={styles.discountLabel}>
+                    🎁 Récompense de parrainage ({rewardsToUse?.length || 0} récompense{(rewardsToUse?.length || 0) > 1 ? 's' : ''})
+                  </Text>
+                  <Text style={styles.discountValue}>
+                    -{formatPrice(referralDiscount)} FCFA
+                  </Text>
+                </View>
+              </View>
+            )}
+            
             <View style={styles.priceContainer}>
               <Text style={styles.totalLabel}>Total à payer</Text>
               <Text style={styles.totalAmount}>
-                {totalPrice?.toLocaleString() || '0'} FCFA
+                {formatPrice(totalPrice)} FCFA
               </Text>
             </View>
           </View>
@@ -503,7 +555,7 @@ const PaymentScreen = ({ route, navigation }) => {
                 <View style={styles.infoBox}>
                   <Ionicons name="information-circle" size={20} color={COLORS.success || 'green'} />
                   <Text style={styles.infoText}>
-                    Mode démo : Le paiement de {totalPrice?.toLocaleString()} FCFA sera automatiquement accepté après confirmation
+                    Mode démo : Le paiement de {formatPrice(totalPrice)} FCFA sera automatiquement accepté après confirmation
                   </Text>
                 </View>
               </View>
@@ -514,7 +566,7 @@ const PaymentScreen = ({ route, navigation }) => {
               <Text style={styles.summaryTitle}>Résumé du paiement</Text>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Montant total</Text>
-                <Text style={styles.summaryAmount}>{totalPrice?.toLocaleString()} FCFA</Text>
+                <Text style={styles.summaryAmount}>{formatPrice(totalPrice)} FCFA</Text>
               </View>
             </View>
           </ScrollView>
@@ -534,7 +586,7 @@ const PaymentScreen = ({ route, navigation }) => {
       {/* Footer avec bouton de paiement */}
       <View style={styles.footer}>
         <Button
-          title={`Payer ${totalPrice?.toLocaleString() || '0'} FCFA`}
+          title={`Payer ${formatPrice(totalPrice)} FCFA`}
           onPress={handlePayment}
           disabled={!selectedPaymentMethod}
         />
@@ -929,6 +981,52 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.primary,
+  },
+
+  discountSection: {
+    marginBottom: SPACING.md,
+  },
+
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.xs,
+  },
+
+  priceLabel: {
+    fontSize: 14,
+    color: COLORS.text.secondary,
+  },
+
+  priceValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.text.primary,
+  },
+
+  discountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.xs,
+    backgroundColor: COLORS.success + '10',
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.sm,
+    marginTop: SPACING.xs,
+  },
+
+  discountLabel: {
+    fontSize: 14,
+    color: COLORS.success,
+    fontWeight: '500',
+    flex: 1,
+  },
+
+  discountValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.success,
   },
 
   modalFooter: {

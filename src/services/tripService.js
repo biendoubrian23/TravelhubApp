@@ -110,7 +110,7 @@ export const tripService = {
             minute: '2-digit' 
           }),
           prix: trip.price_fcfa,
-          is_vip: trip.buses?.is_vip || false,
+          is_vip: trip.bus_type === 'VIP' || trip.buses?.is_vip || false,
           bus_type: trip.bus_type,
           agencies: {
             nom: trip.agencies?.name || 'Agence inconnue',
@@ -120,7 +120,7 @@ export const tripService = {
             id: trip.buses?.id,
             name: trip.buses?.name,
             total_seats: totalSeats,
-            is_vip: trip.buses?.is_vip || false
+            is_vip: trip.bus_type === 'VIP' || trip.buses?.is_vip || false
           },
           trip_services: [{
             wifi: trip.amenities?.includes('wifi') || false,

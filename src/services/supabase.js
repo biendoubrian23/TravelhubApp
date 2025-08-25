@@ -60,9 +60,9 @@ export const authService = {
             avatar_url: null,
             is_active: true,
             last_login: new Date().toISOString(),
-            is_generated_user: false,
-            password_changed: false,
-            generated_by: null
+            // 🆕 AJOUT DU CODE DE PARRAINAGE
+            referred_by_code: userData.referred_by_code || null,
+            // Le referral_code sera généré automatiquement par le trigger PostgreSQL
           }
 
           console.log('🔍 Données à insérer dans table users:', userRecord);
@@ -79,6 +79,11 @@ export const authService = {
             // Pour l'instant on continue, l'utilisateur pourra se connecter
           } else {
             console.log('✅ Utilisateur créé avec succès dans la table users:', userInsertData)
+            
+            // 🆕 CRÉER LE LIEN DE PARRAINAGE SI NÉCESSAIRE
+            if (userData.referred_by_code && userInsertData.id) {
+              await createReferralLink(userInsertData.id, userData.referred_by_code)
+            }
           }
         } else {
           console.log('ℹ️ Utilisateur existe déjà dans la table users:', existingUser.id);
@@ -209,8 +214,7 @@ export const authService = {
             ville: user.user_metadata?.ville || null,
             role: 'client',
             is_active: true,
-            last_login: new Date().toISOString(),
-            is_generated_user: false
+            last_login: new Date().toISOString()
           };
 
           const { data: newUser, error: createError } = await supabase
@@ -268,6 +272,45 @@ export const agencyService = {
       .select()
     
     return { data, error }
+  }
+}
+
+// 🆕 FONCTION POUR CRÉER LE LIEN DE PARRAINAGE
+async function createReferralLink(referredUserId, referralCode) {
+  try {
+    console.log(`🔗 Création du lien de parrainage pour utilisateur ${referredUserId} avec code ${referralCode}`)
+    
+    // Trouver le parrain qui possède ce code
+    const { data: referrer, error: referrerError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('referral_code', referralCode)
+      .single()
+    
+    if (referrerError || !referrer) {
+      console.error('❌ Code de parrainage invalide:', referralCode)
+      return
+    }
+    
+    // Créer l'enregistrement de parrainage
+    const { data: referral, error: referralError } = await supabase
+      .from('referrals')
+      .insert({
+        referrer_id: referrer.id,
+        referred_id: referredUserId,
+        referral_code: referralCode,
+        status: 'pending'
+      })
+      .select()
+      .single()
+    
+    if (referralError) {
+      console.error('❌ Erreur lors de la création du lien de parrainage:', referralError)
+    } else {
+      console.log('✅ Lien de parrainage créé avec succès:', referral)
+    }
+  } catch (error) {
+    console.error('❌ Erreur dans createReferralLink:', error)
   }
 }
 
