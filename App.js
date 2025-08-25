@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { StatusBar } from 'expo-status-bar'
 import { StyleSheet, View, useColorScheme } from 'react-native'
 import { PaperProvider, MD3LightTheme } from 'react-native-paper'
@@ -9,6 +9,9 @@ import AppNavigator from './src/navigation/AppNavigator'
 
 // Constants
 import { COLORS } from './src/constants'
+
+// Services
+import avatarService from './src/services/avatarServiceSimple'
 
 // Thème personnalisé en mode clair uniquement
 const lightTheme = {
@@ -23,6 +26,21 @@ const lightTheme = {
 }
 
 export default function App() {
+  // Initialiser les services au démarrage
+  useEffect(() => {
+    const initializeServices = async () => {
+      try {
+        // Initialiser le bucket avatars
+        await avatarService.initializeBucket();
+        console.log('✅ Services d\'avatar initialisés');
+      } catch (error) {
+        console.error('❌ Erreur lors de l\'initialisation des services:', error);
+      }
+    };
+
+    initializeServices();
+  }, []);
+
   return (
     <PaperProvider theme={lightTheme}>
       <View style={styles.container}>

@@ -264,6 +264,9 @@ Mon code de parrainage : ${referralData.referralCode}
           </Text>
         </View>
 
+        {/* Trait séparateur bleu */}
+        <View style={styles.blueSeparator} />
+
         {/* Statistiques */}
         <View style={styles.statsSection}>
           <Text style={styles.sectionTitle}>Mes statistiques</Text>
@@ -291,6 +294,9 @@ Mon code de parrainage : ${referralData.referralCode}
             />
           </View>
         </View>
+
+        {/* Trait séparateur bleu */}
+        <View style={styles.blueSeparator} />
 
         {/* Comment ça marche */}
         <View style={styles.howItWorksSection}>
@@ -345,6 +351,10 @@ Mon code de parrainage : ${referralData.referralCode}
 
         {/* Liste des parrainages */}
         {referralData.referralsList.length > 0 && (
+          <>
+            {/* Trait séparateur bleu */}
+            <View style={styles.blueSeparator} />
+            
             <View style={styles.referralsSection}>
               <Text style={styles.sectionTitle}>Mes parrainages récents</Text>
               {referralData.referralsList.slice(0, 5).map((referral, index) => (
@@ -365,6 +375,7 @@ Mon code de parrainage : ${referralData.referralCode}
                 </View>
               ))}
             </View>
+          </>
         )}
 
         {/* Espacement pour le bouton fixe */}
@@ -653,6 +664,15 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     marginLeft: SPACING.sm,
+  },
+
+  // Trait séparateur bleu très fin
+  blueSeparator: {
+    height: 2, // Doublé de 0.5 à 1
+    backgroundColor: COLORS.primary, // Couleur bleue de votre thème
+    marginHorizontal: SPACING.lg,
+    marginVertical: SPACING.xs,
+    opacity: 0.3, // Légèrement transparent pour être subtil
   },
 })
 

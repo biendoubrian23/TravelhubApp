@@ -9,11 +9,13 @@ import {
   Alert,
   Linking,
   Share,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
+import avatarService from '../../services/avatarServiceSimple';
 
 const ProfileScreen = ({ navigation }) => {
   const { user, signOut, updateProfile } = useAuthStore();
@@ -144,12 +146,38 @@ const ProfileScreen = ({ navigation }) => {
     );
   };
 
+  const [avatarLoading, setAvatarLoading] = useState(false);
+
   const pickProfileImage = async () => {
-    Alert.alert(
-      'Photo de profil',
-      'Cette fonctionnalité sera bientôt disponible',
-      [{ text: 'OK' }]
-    );
+    try {
+      setAvatarLoading(true);
+      
+      // Utiliser la version simplifiée temporairement
+      const result = await avatarService.changeAvatarSimple(user.id);
+      
+      if (result.success) {
+        Alert.alert(
+          'Succès !',
+          result.message,
+          [{ text: 'OK' }]
+        );
+        
+        // Recharger les données utilisateur
+        loadUserStats();
+      } else {
+        // Pas d'alerte d'erreur car le service affiche déjà sa propre alerte
+        console.log('Service avatar:', result.message);
+      }
+    } catch (error) {
+      console.error('Erreur lors du changement d\'avatar:', error);
+      Alert.alert(
+        'Erreur',
+        'Une erreur inattendue s\'est produite',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setAvatarLoading(false);
+    }
   };
 
   const referFriend = async () => {
@@ -207,10 +235,11 @@ const ProfileScreen = ({ navigation }) => {
       {/* Header avec photo de profil */}
       <View style={styles.header}>
         <View style={styles.profileSection}>
-          <TouchableOpacity onPress={pickProfileImage} style={styles.avatarContainer}>
-            {user?.user_metadata?.profileImage ? (
+          <TouchableOpacity onPress={pickProfileImage} style={styles.avatarContainer} disabled={avatarLoading}>
+            {/* Afficher l'avatar depuis la BD ou les métadonnées */}
+            {user?.user_metadata?.avatar_url ? (
               <Image 
-                source={{ uri: user.user_metadata.profileImage }} 
+                source={{ uri: user.user_metadata.avatar_url }} 
                 style={styles.avatar} 
               />
             ) : (
@@ -218,8 +247,14 @@ const ProfileScreen = ({ navigation }) => {
                 <Ionicons name="person" size={30} color={COLORS.text.secondary} />
               </View>
             )}
+            
+            {/* Overlay avec icône ou loader */}
             <View style={styles.cameraOverlay}>
-              <Ionicons name="camera" size={16} color={COLORS.surface} />
+              {avatarLoading ? (
+                <ActivityIndicator size="small" color={COLORS.surface} />
+              ) : (
+                <Ionicons name="camera" size={16} color={COLORS.surface} />
+              )}
             </View>
           </TouchableOpacity>
           

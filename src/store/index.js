@@ -207,6 +207,41 @@ export const useAuthStore = create(devtools((set, get) => ({
       console.error('Erreur lors de l\'initialisation de l\'auth:', error)
       set({ user: null, isAuthenticated: false, isLoading: false })
     }
+  },
+
+  // Fonction pour mettre à jour le profil utilisateur
+  updateProfile: async (updatedMetadata) => {
+    try {
+      const currentUser = get().user;
+      if (!currentUser) {
+        throw new Error('Aucun utilisateur connecté');
+      }
+
+      // Importer Supabase
+      const { supabase } = await import('../services/supabase');
+      
+      // Mettre à jour les métadonnées utilisateur dans Supabase Auth
+      const { data, error } = await supabase.auth.updateUser({
+        data: updatedMetadata
+      });
+
+      if (error) {
+        console.error('Erreur lors de la mise à jour du profil:', error);
+        throw error;
+      }
+
+      // Mettre à jour le store local
+      if (data?.user) {
+        set({ user: data.user });
+        console.log('✅ Profil utilisateur mis à jour avec succès');
+        return { success: true, user: data.user };
+      }
+
+      return { success: false, error: 'Pas de données utilisateur retournées' };
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du profil:', error);
+      throw error;
+    }
   }
 }), {
   name: 'auth-store'
