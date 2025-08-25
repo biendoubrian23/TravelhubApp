@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../../components';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
+import logger from '../../utils/logger';
 
 const PaymentScreen = ({ route, navigation }) => {
   const { 
@@ -44,27 +45,8 @@ const PaymentScreen = ({ route, navigation }) => {
 
   // Déplacer les logs dans useEffect pour éviter la répétition
   useEffect(() => {
-    console.log('PaymentScreen - Data received:', { 
-      trip, 
-      outboundTrip, 
-      returnTrip, 
-      selectedSeats, 
-      returnSelectedSeats, 
-      totalPrice,
-      originalPrice,
-      referralDiscount,
-      discountApplied,
-      rewardsToUse,
-      isRoundTrip,
-      searchParams,
-      userInfo
-    }); 
-    console.log('PaymentScreen - selectedSeats details:', selectedSeats);
-    console.log('PaymentScreen - returnSelectedSeats details:', returnSelectedSeats);
-    console.log('PaymentScreen - selectedSeats length:', selectedSeats?.length);
-    console.log('PaymentScreen - returnSelectedSeats length:', returnSelectedSeats?.length);
-    console.log('PaymentScreen - searchParams:', searchParams);
-    console.log('PaymentScreen - isRoundTrip:', isRoundTrip);
+    logger.info('PaymentScreen - searchParams:', searchParams);
+    logger.info('PaymentScreen - isRoundTrip:', isRoundTrip);
   }, []); // Exécuter seulement au montage du composant
 
   // Helper function pour formater les prix

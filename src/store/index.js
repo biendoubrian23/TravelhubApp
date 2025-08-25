@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import { bookingService } from '../services/bookingService'
+import logger from '../utils/logger'
 
 // Store d'authentification
 export const useAuthStore = create(devtools((set, get) => ({
@@ -335,7 +336,7 @@ export const useBookingsStore = create(devtools((set, get) => ({
           })
           
           // Recharger les réservations depuis Supabase pour avoir les vraies données
-          console.log('🔄 Rechargement des réservations depuis BD après sauvegarde');
+          logger.info('🔄 Rechargement des réservations depuis BD après sauvegarde');
           setTimeout(() => {
             get().loadBookings(user);
           }, 500);
@@ -367,15 +368,14 @@ export const useBookingsStore = create(devtools((set, get) => ({
       const currentBookings = Array.isArray(currentState.bookings) ? currentState.bookings : []; // Préserver les réservations existantes
       
       if (user?.id) {
-        console.log('🔄 Chargement des réservations depuis Supabase pour:', user.email);
+        logger.info('🔄 Chargement des réservations depuis Supabase pour:', user.email);
         
         try {
           // Charger depuis Supabase pour les utilisateurs connectés
           const data = await bookingService.getUserBookings(user.id)
-          console.log('✅ Réservations récupérées depuis Supabase:', data);
           
           if (data && data.length > 0) {
-            console.log('📋 Données brutes de Supabase:', data.length, 'réservations');
+            logger.info('📋 Données brutes de Supabase:', data.length, 'réservations');
             
             // 🚫 SUPPRESSION DU GROUPEMENT - Chaque réservation reste séparée
             // Transformer chaque réservation individuellement (PAS de groupement)
@@ -422,23 +422,14 @@ export const useBookingsStore = create(devtools((set, get) => ({
             }).filter(booking => booking.id); // Filtrer les réservations sans ID
             
             // Pour éviter les doublons, on privilégie UNIQUEMENT les données Supabase
-            // Les réservations locales ne sont conservées que si elles n'ont pas encore été synchronisées
-            const safeCurrentBookings = Array.isArray(currentBookings) ? currentBookings : [];
-            const localOnlyBookings = safeCurrentBookings.filter(local => 
-              // Garder seulement les réservations locales qui n'ont pas d'équivalent en BD
-              !local.syncedWithDB && // Pas encore synchronisées
-              !transformedBookings.find(db => 
-                db.trip_id === local.trip_id && 
-                db.seatNumber === local.seatNumber &&
-                Math.abs(new Date(db.bookingDate) - new Date(local.bookingDate)) < 60000 // Même minute
-              )
-            );
+            // ✅ SUPPRESSION COMPLÈTE des réservations locales temporaires
+            // Les données Supabase sont la source de vérité unique
             
-            console.log(`📋 Déduplication: ${transformedBookings.length} Supabase + ${localOnlyBookings.length} locales non sync = ${transformedBookings.length + localOnlyBookings.length} total`);
+            logger.info(`📋 Réservations Supabase: ${transformedBookings.length}`);
             
-            const allBookings = [...transformedBookings, ...localOnlyBookings];
+            const allBookings = transformedBookings; // ✅ Seulement Supabase
             
-            console.log(`📋 Total réservations: ${allBookings.length} (${transformedBookings.length} BD + ${localOnlyBookings.length} locales)`);
+            logger.info(`📋 Total réservations: ${allBookings.length} (toutes depuis BD)`);
             
             set({ 
               bookings: allBookings,

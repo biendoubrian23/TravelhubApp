@@ -14,6 +14,7 @@ import { Button } from '../../components';
 import { useBookingsStore, useAuthStore } from '../../store';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
 import { bookingService } from '../../services';
+import logger from '../../utils/logger';
 
 const PaymentSuccessScreen = ({ route, navigation }) => {
   const { 
@@ -40,7 +41,7 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
   
   const bookingKey = `${tripId}_${userId}_${seatNumbers}_${Date.now()}`;
   
-  console.log('🔑 Clé de réservation générée:', bookingKey);
+  logger.info('🔑 Clé de réservation générée:', bookingKey);
   
   // Utiliser une Map globale pour éviter les doublons entre différentes instances
   if (!global.processedBookings) {
@@ -83,7 +84,7 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
       
       // Si l'entrée existe et qu'elle a moins de 5 minutes, on considère que c'est un doublon
       if (existingEntry && (now - existingEntry) < 5 * 60 * 1000) {
-        console.log('🛑 Réservation déjà créée récemment, pas de duplication pour:', bookingKey);
+        // Réservation déjà créée récemment, pas de duplication
         return;
       }
 
@@ -98,7 +99,7 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
       setBookingCreated(true);
       global.processedBookings.set(bookingKey, now);
       
-      console.log('🚀 Création de la réservation après confirmation de paiement pour:', bookingKey);
+      // Création de la réservation après confirmation de paiement
 
       try {
         // Préparer les données pour le service de réservation Supabase
@@ -117,67 +118,35 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
         const savedBookings = await bookingService.createMultipleBookings(bookingData);
         
         if (savedBookings && Array.isArray(savedBookings) && savedBookings.length > 0) {
-          console.log(`✅ ${savedBookings.length} réservations sauvegardées dans Supabase:`, savedBookings);
+          // Réservations sauvegardées dans Supabase
           
           // 🆕 MARQUER LES RÉCOMPENSES COMME UTILISÉES
           if (rewardsToUse && Array.isArray(rewardsToUse) && rewardsToUse.length > 0 && referralDiscount > 0) {
-            console.log('💰 Marquage des récompenses de parrainage comme utilisées...');
-            console.log('- Récompenses à marquer:', rewardsToUse);
-            console.log('- Montant utilisé:', referralDiscount);
+            // Marquage des récompenses de parrainage comme utilisées
             
             try {
               const firstBookingId = savedBookings[0]?.id;
               const claimResult = await bookingService.claimRewards(user.id, referralDiscount, firstBookingId);
               
               if (claimResult) {
-                console.log('✅ Récompenses marquées comme utilisées avec succès');
+                // Récompenses marquées comme utilisées avec succès
               } else {
-                console.error('❌ Échec du marquage des récompenses');
+                // Échec du marquage des récompenses
               }
             } catch (claimError) {
-              console.error('❌ Erreur lors du marquage des récompenses:', claimError);
+              // Erreur lors du marquage des récompenses
             }
           }
           
-          // CORRECTION : Créer UNE SEULE entrée locale pour toutes les réservations de ce groupe
-          // au lieu d'une entrée par siège (pour éviter les doublons visuels)
-          const allSeatNumbers = savedBookings.map(booking => booking.seat_number).join(', ');
-          const firstBooking = savedBookings[0]; // Prendre la première pour les infos générales
+          // ✅ NE PLUS CRÉER DE RÉSERVATION GROUPÉE LOCALE
+          // Les réservations individuelles seront chargées depuis Supabase automatiquement
+          // via loadBookings() lors du prochain focus de l'écran BookingsScreen
           
-          const localBooking = {
-            id: firstBooking.booking_reference,
-            booking_reference: firstBooking.booking_reference,
-            departure: trip?.departure_city || 'Départ',
-            arrival: trip?.arrival_city || 'Arrivée',
-            date: trip?.departure_date || new Date().toISOString().split('T')[0],
-            time: trip?.departure_time || new Date().toTimeString().substring(0, 5),
-            price: totalPrice || 0, // Prix total pour le groupe
-            status: 'upcoming',
-            busType: trip?.bus_type || 'VIP',
-            agency: trip?.agency?.name || 'TravelHub',
-            seatNumber: allSeatNumbers, // Tous les sièges séparés par virgule
-            selectedSeats: selectedSeats,
-            paymentMethod: paymentMethod || 'orange_money',
-            duration: trip?.duration || '3h 30min',
-            trip: trip || {},
-            tripId: trip?.id,
-            totalPrice: totalPrice || 0,
-            bookingDate: new Date().toISOString().split('T')[0],
-            // Ajouter les références de toutes les réservations individuelles
-            supabaseBookings: savedBookings
-          };
-          
-          // Ajouter UNE SEULE entrée au store local
-          useBookingsStore.setState(state => ({
-            bookings: [localBooking, ...state.bookings]
-          }));
-          
-          console.log('✅ Réservation groupée ajoutée au store local:', localBooking);
         } else {
-          console.warn('⚠️ Aucune réservation retournée par le service');
+          // Aucune réservation retournée par le service
         }
       } catch (error) {
-        console.error('❌ Erreur lors de la création de la réservation:', error);
+        // Erreur lors de la création de la réservation
         // En cas d'erreur, permettre un nouvel essai
         setBookingCreated(false);
         global.processedBookings.delete(bookingKey);

@@ -1,7 +1,52 @@
 import { supabase } from './supabaseClient'
+import logger from '../utils/logger'
 
 export const bookingService = {
   // Vérifier et appliquer le discount de parrainage
+  // Vérifier le parrainage pour la première réservation
+  async checkReferralForFirstBooking(userId) {
+    try {
+      // Vérifier si l'utilisateur a été parrainé
+      const { data: referralData, error: referralError } = await supabase
+        .from('referrals')
+        .select('*')
+        .eq('referred_id', userId)
+        .eq('status', 'pending') // Seulement les parrainages encore pending
+        .single()
+
+      if (referralError || !referralData) {
+        logger.info('👤 Aucun parrainage pending trouvé pour cet utilisateur');
+        return { hasDiscount: false, discount: 0 }
+      }
+
+      // Vérifier si c'est réellement la première réservation
+      const { data: existingBookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('user_id', userId)
+
+      if (bookingsError) {
+        console.error('Erreur lors de la vérification des réservations existantes:', bookingsError)
+        return { hasDiscount: false, discount: 0 }
+      }
+
+      const bookingCount = existingBookings ? existingBookings.length : 0
+      logger.info(`📊 Réservations existantes pour l'utilisateur: ${bookingCount}`);
+
+      if (bookingCount > 0) {
+        logger.info('❌ Ce n\'est pas la première réservation - pas de récompense');
+        return { hasDiscount: false, discount: 0 }
+      }
+
+      logger.info('✅ Première réservation confirmée - le parrain recevra une récompense');
+      return { hasDiscount: false, discount: 0, referralId: referralData.id, isFirstBooking: true }
+      
+    } catch (error) {
+      console.error('Erreur lors de la vérification du parrainage:', error)
+      return { hasDiscount: false, discount: 0 }
+    }
+  },
+
   async checkReferralDiscount(userId) {
     try {
       // Vérifier si l'utilisateur a été parrainé
@@ -12,14 +57,12 @@ export const bookingService = {
         .single()
 
       if (referralError || !referralData) {
-        console.log('👤 Aucun parrainage trouvé pour cet utilisateur')
+        // Aucun parrainage trouvé pour cet utilisateur
         return { hasDiscount: false, discount: 0 }
       }
 
       // NOTE: Dans notre système, seul le PARRAIN reçoit 500 FCFA, pas le filleul
       // Le filleul n'a aucune réduction, c'est juste pour aider le parrain à gagner
-      console.log('� Utilisateur parrainé trouvé, mais aucune réduction pour le filleul')
-      console.log('💰 Le parrain recevra 500 FCFA après la première réservation du filleul')
       
       return { hasDiscount: false, discount: 0, referralId: referralData.id }
     } catch (error) {
@@ -31,8 +74,8 @@ export const bookingService = {
   // Créer plusieurs réservations (une par siège)
   async createMultipleBookings(bookingData) {
     try {
-      console.log('=== DÉBUT CRÉATION RÉSERVATIONS MULTIPLES ===');
-      console.log('Données reçues:', bookingData);
+      logger.info('=== DÉBUT CRÉATION RÉSERVATIONS MULTIPLES ===');
+      logger.log('Données reçues:', bookingData);
       
       // Validation des données essentielles
       if (!bookingData.tripId || !bookingData.userId) {
@@ -134,9 +177,9 @@ export const bookingService = {
 
       console.log(`✅ Sièges ${finalSeatNumbers.join(', ')} marqués comme occupés`);
 
-      // Vérifier le parrainage pour récompenser le parrain (pas de réduction pour le filleul)
-      const referralInfo = await this.checkReferralDiscount(bookingData.userId);
-      console.log('💰 Informations de parrainage:', referralInfo);
+      // Vérifier le parrainage AVANT de créer les réservations pour savoir si c'est la première
+      const referralInfo = await this.checkReferralForFirstBooking(bookingData.userId);
+      logger.info('💰 Informations de parrainage:', referralInfo);
 
       // Créer une réservation pour chaque siège
       const createdBookings = [];
@@ -184,8 +227,10 @@ export const bookingService = {
         console.log(`✅ Réservation créée pour siège ${seatNumber}:`, data.id);
       }
 
-      // Si l'utilisateur a été parrainé, créer la récompense pour le parrain
-      if (referralInfo.referralId) {
+      // Si l'utilisateur a été parrainé ET que c'est sa première réservation, créer la récompense pour le parrain
+      // ✅ CORRECTION : Créer la récompense UNE SEULE FOIS pour toutes les réservations du groupe
+      if (referralInfo.referralId && referralInfo.isFirstBooking) {
+        logger.info('🎁 Première réservation d\'un filleul - création de la récompense pour le parrain');
         await this.createReferralReward(referralInfo.referralId, bookingData.userId, 500);
       }
 
@@ -596,18 +641,6 @@ export const bookingService = {
         
         const date = departureTime ? departureTime.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
         
-        console.log(`🔄 Enrichissement booking ${booking.id}:`, {
-          booking_trip_id: booking.trip_id,
-          found_trip: trip,
-          departure_city: trip.departure_city,
-          arrival_city: trip.arrival_city,
-          departure_time: trip.departure_time,
-          arrival_time: trip.arrival_time,
-          heure_dep,
-          heure_arr,
-          found_agency: agency
-        });
-        
         return {
           ...booking,
           trips: {
@@ -624,7 +657,6 @@ export const bookingService = {
         }
       })
 
-      console.log('✅ Données enrichies finales:', enrichedBookings);
       return enrichedBookings
     } catch (error) {
       console.error('Erreur dans getUserBookings:', error)
@@ -858,26 +890,35 @@ export const bookingService = {
       }
 
       // ⚠️ IMPORTANT : Vérifier que c'est la PREMIÈRE réservation de l'ami parrainé
+      // CORRECTION : Compter les réservations CONFIRMÉES seulement (status confirmed/completed)
       const { data: existingBookings, error: bookingsError } = await supabase
         .from('bookings')
         .select('id')
         .eq('user_id', referredUserId)
+        .in('booking_status', ['confirmed', 'completed'])
 
       if (bookingsError) {
-        console.error('Erreur lors de la vérification des réservations:', bookingsError)
+        logger.error('Erreur lors de la vérification des réservations:', bookingsError)
         return
       }
 
       const bookingCount = existingBookings ? existingBookings.length : 0
-      console.log(`📊 Nombre de réservations pour l'utilisateur ${referredUserId}: ${bookingCount}`)
+      logger.info(`📊 Nombre de réservations confirmées pour l'utilisateur ${referredUserId}: ${bookingCount}`)
 
-      // Si ce n'est PAS la première réservation, ne pas créer de récompense
-      if (bookingCount > 1) {
-        console.log('❌ Ce n\'est pas la première réservation - aucune récompense créée')
+      // CORRECTION : Pour la première réservation, le count devrait être exactement 1 
+      // (car on vient de créer la première réservation juste avant)
+      if (bookingCount !== 1) {
+        logger.info('❌ Ce n\'est pas la première réservation - aucune récompense créée')
         return
       }
 
-      console.log('✅ C\'est la première réservation - création de la récompense')
+      // Vérifier aussi que le parrainage est encore "pending"
+      if (referralData.status !== 'pending') {
+        logger.info('❌ Parrainage déjà complété - aucune récompense créée')
+        return
+      }
+
+      logger.info('✅ C\'est la première réservation et parrainage pending - création de la récompense')
 
       // Créer la récompense pour le parrain (UNIQUEMENT)
       const { data: reward, error: rewardError } = await supabase

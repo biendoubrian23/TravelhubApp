@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING } from '../../constants';
 import { formatDate, formatPrice } from '../../utils/helpers';
 import { useBookingsStore, useAuthStore } from '../../store';
+import logger from '../../utils/logger';
 
 const BookingsScreen = ({ navigation: routeNavigation }) => {
   const { bookings, loadBookings, isLoading } = useBookingsStore();
@@ -25,23 +26,29 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
 
   useEffect(() => {
     // Charger les réservations quand l'utilisateur change ou au premier rendu
-    console.log('🔄 BookingsScreen - useEffect triggered, user:', user?.email);
-    loadBookings(user);
+    if (user?.id) {
+      logger.info('🔄 BookingsScreen - useEffect triggered, user:', user?.email);
+      loadBookings(user);
+    }
   }, [user]);
 
   // Force refresh when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      console.log('📱 BookingsScreen - Screen focused, reloading bookings');
-      loadBookings(user);
+      logger.info('📱 BookingsScreen - Screen focused, reloading bookings');
+      if (user?.id) {
+        loadBookings(user);
+      }
     }, [user])
   );
 
   // Rafraîchir les données seulement si on tire pour rafraîchir
   
-  const handleRefresh = () => {
-    console.log('🔄 BookingsScreen - Manual refresh triggered');
-    loadBookings(user);
+  const handleRefresh = async () => {
+    logger.info('🔄 BookingsScreen - Manual refresh triggered');
+    if (user?.id) {
+      loadBookings(user);
+    }
   };
 
   // Adapter les données du store vers le format attendu par l'interface
@@ -100,7 +107,7 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
 
   // Adapter toutes les réservations avec filtrage des valeurs null
   const safeBookings = Array.isArray(bookings) ? bookings : [];
-  console.log('BookingsScreen - Type de bookings:', typeof bookings, 'Is Array:', Array.isArray(bookings), 'Length:', safeBookings.length);
+  logger.info('BookingsScreen - Type de bookings:', typeof bookings, 'Is Array:', Array.isArray(bookings), 'Length:', safeBookings.length);
   
   const adaptedBookings = safeBookings
     .map(adaptBookingData)
@@ -109,7 +116,7 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
   const filteredBookings = adaptedBookings.filter(booking => {
     // Protection supplémentaire contre les objets mal formés
     if (!booking || !booking.trip) {
-      console.warn('BookingsScreen - Réservation ou trip manquant:', booking);
+      logger.warn('BookingsScreen - Réservation ou trip manquant:', booking);
       return false;
     }
 
@@ -132,10 +139,6 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
   });
   
   console.log('BookingsScreen - Nombre de réservations:', bookings.length);
-  console.log('BookingsScreen - Réservations brutes:', bookings);
-  console.log('BookingsScreen - Réservations adaptées:', adaptedBookings);
-  console.log('BookingsScreen - Réservations filtrées:', filteredBookings);
-
   const getStatusColor = (status) => {
     switch (status) {
       case 'confirmed': return '#4CAF50';

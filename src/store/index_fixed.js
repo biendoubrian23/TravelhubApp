@@ -164,7 +164,6 @@ export const useBookingsStore = create(devtools((set, get) => ({
         try {
           // Charger depuis Supabase pour les utilisateurs connectés
           const data = await bookingService.getUserBookings(user.id)
-          console.log('✅ Réservations récupérées depuis Supabase:', data);
           
           if (data && data.length > 0) {
             // Transformer les données Supabase au format attendu avec protection
