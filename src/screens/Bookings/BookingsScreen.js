@@ -18,12 +18,38 @@ import { useBookingsStore, useAuthStore } from '../../store';
 import logger from '../../utils/logger';
 import { getResponsiveFontSize, getScreenType } from '../../utils/responsive';
 
+// Import conditionnel du service de facturation
+let invoiceService = null;
+try {
+  const invoiceServiceModule = require('../../services/invoiceService');
+  invoiceService = invoiceServiceModule.invoiceService;
+} catch (error) {
+  console.log('⚠️ Service de facturation non disponible', error);
+}
+
 const BookingsScreen = ({ navigation: routeNavigation }) => {
   const { bookings, loadBookings, isLoading } = useBookingsStore();
   const { user } = useAuthStore();
   const navigation = useNavigation(); // Hook pour la navigation
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('all');
+  
+  // Styles communs pour les boutons d'action
+  const screenWidth = Dimensions.get('window').width;
+  const isSmallScreen = screenWidth < 360;
+  
+  const buttonStyle = {
+    flex: 1,
+    height: 38,
+    minWidth: isSmallScreen ? undefined : 85,
+    maxWidth: isSmallScreen ? undefined : 120,
+  };
+  
+  const buttonLabelStyle = {
+    fontSize: isSmallScreen ? 10 : 12,
+    marginVertical: 0,
+    textAlign: 'center',
+  };
 
   useEffect(() => {
     // Charger les réservations quand l'utilisateur change ou au premier rendu
@@ -159,6 +185,77 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
       default: return status;
     }
   };
+  
+  // Fonction pour créer une facture individuelle pour une réservation
+  const handleCreateInvoice = async (booking) => {
+    // Vérifier si le billet est annulé
+    if (booking.booking_status === 'cancelled') {
+      Alert.alert(
+        "Action impossible",
+        "Les factures ne peuvent pas être générées pour les réservations annulées.",
+        [{ text: "Compris", style: "default" }]
+      );
+      return;
+    }
+    
+    if (!invoiceService) {
+      Alert.alert(
+        "Service indisponible", 
+        "Le service de facturation n'est pas disponible sur votre appareil."
+      );
+      return;
+    }
+    
+    try {
+      // Vérifier si une facture existe déjà
+      const invoiceExists = await invoiceService.checkInvoiceExists(booking.id);
+      
+      if (invoiceExists) {
+        // Si une facture existe, proposer de voir la facture existante
+        Alert.alert(
+          "Facture existante",
+          "Une facture existe déjà pour cette réservation. Voulez-vous la consulter?",
+          [
+            { text: "Non", style: "cancel" },
+            { 
+              text: "Voir la facture", 
+              onPress: () => navigation.navigate('Invoices') 
+            }
+          ]
+        );
+        return;
+      }
+      
+      // Montrer l'indicateur de chargement
+      Alert.alert(
+        "Création de facture",
+        "Création de votre facture en cours...",
+        [{ text: "OK" }]
+      );
+      
+      // Créer la facture
+      const invoice = await invoiceService.createInvoice(booking, user);
+      
+      if (invoice) {
+        Alert.alert(
+          "Facture créée",
+          "Votre facture a été créée avec succès. Voulez-vous la consulter maintenant?",
+          [
+            { text: "Plus tard", style: "cancel" },
+            { 
+              text: "Voir maintenant", 
+              onPress: () => navigation.navigate('InvoicePreview', { invoice }) 
+            }
+          ]
+        );
+      } else {
+        Alert.alert("Erreur", "Impossible de créer la facture. Veuillez réessayer.");
+      }
+    } catch (error) {
+      console.error("❌ Erreur création facture:", error);
+      Alert.alert("Erreur", "Une erreur est survenue lors de la création de la facture.");
+    }
+  };
 
   const renderBookingCard = (booking) => (
     <Card key={booking.id} style={{ marginBottom: SPACING.md, elevation: 2 }}>
@@ -280,33 +377,95 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
         </Surface>
 
         {/* Actions */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Button 
-            mode="outlined" 
-            onPress={() => navigation.navigate('BookingDetails', { bookingId: booking.id })}
-            style={{ flex: 1, marginRight: SPACING.xs }}
-          >
-            Détails
-          </Button>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: SPACING.xs }}>
+          <View style={{ flex: 1 }}>
+            <Button 
+              mode="outlined" 
+              onPress={() => navigation.navigate('BookingDetails', { bookingId: booking.id })}
+              style={buttonStyle}
+              labelStyle={buttonLabelStyle}
+              contentStyle={{ height: 36 }}
+            >
+              Détails
+            </Button>
+          </View>
           
           {booking.booking_status === 'confirmed' && (
-            <Button 
-              mode="contained" 
-              onPress={() => Alert.alert('E-Billet', 'Fonctionnalité de téléchargement bientôt disponible')}
-              style={{ flex: 1, marginLeft: SPACING.xs }}
-            >
-              E-Billet
-            </Button>
+            <>
+              <View style={{ flex: 1 }}>
+                <Button 
+                  mode="contained" 
+                  onPress={() => Alert.alert('E-Billet', 'Fonctionnalité de téléchargement bientôt disponible')}
+                  style={buttonStyle}
+                  labelStyle={buttonLabelStyle}
+                  contentStyle={{ height: 36 }}
+                >
+                  E-Billet
+                </Button>
+              </View>
+              
+              <View style={{ flex: 1 }}>
+                <Button 
+                  mode="contained" 
+                  onPress={() => handleCreateInvoice(booking)}
+                  style={buttonStyle}
+                  buttonColor={COLORS.secondary}
+                  labelStyle={buttonLabelStyle}
+                  contentStyle={{ height: 36 }}
+                  icon="receipt"
+                >
+                  Facture
+                </Button>
+              </View>
+            </>
           )}
           
           {booking.booking_status === 'pending' && (
-            <Button 
-              mode="contained" 
-              onPress={() => navigation.navigate('Payment', { booking })}
-              style={{ flex: 1, marginLeft: SPACING.xs }}
-            >
-              Payer
-            </Button>
+            <View style={{ flex: 1 }}>
+              <Button 
+                mode="contained" 
+                onPress={() => navigation.navigate('Payment', { booking })}
+                style={buttonStyle}
+                labelStyle={buttonLabelStyle}
+                contentStyle={{ height: 36 }}
+              >
+                Payer
+              </Button>
+            </View>
+          )}
+          
+          {booking.booking_status === 'cancelled' && (
+            <>
+              <View style={{ flex: 1 }}>
+                <Button 
+                  mode="contained" 
+                  disabled={true}
+                  style={buttonStyle}
+                  labelStyle={buttonLabelStyle}
+                  contentStyle={{ height: 36 }}
+                >
+                  E-Billet
+                </Button>
+              </View>
+              
+              <View style={{ flex: 1 }}>
+                <Button 
+                  mode="contained" 
+                  onPress={() => Alert.alert(
+                    "Réservation annulée",
+                    "Impossible de générer une facture pour une réservation annulée.",
+                    [{ text: "Fermer" }]
+                  )}
+                  style={buttonStyle}
+                  disabled={true}
+                  labelStyle={buttonLabelStyle}
+                  contentStyle={{ height: 36 }}
+                  icon="receipt"
+                >
+                  Facture
+                </Button>
+              </View>
+            </>
           )}
         </View>
       </Card.Content>

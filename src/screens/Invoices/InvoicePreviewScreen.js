@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,18 @@ import { Button } from '../../components';
 
 const InvoicePreviewScreen = ({ route, navigation }) => {
   const { invoice } = route.params;
+
+  // Vérifier si la facture est liée à une réservation annulée
+  useEffect(() => {
+    // Vérifier si la réservation est annulée
+    if (invoice.bookings?.booking_status === 'cancelled') {
+      Alert.alert(
+        "Réservation annulée",
+        "Cette facture est liée à une réservation annulée. Certaines fonctionnalités peuvent être limitées.",
+        [{ text: "Compris" }]
+      );
+    }
+  }, [invoice]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Date invalide';
@@ -53,6 +65,16 @@ const InvoicePreviewScreen = ({ route, navigation }) => {
   };
 
   const handleShare = async () => {
+    // Vérifier si la réservation est annulée
+    if (invoice.bookings?.booking_status === 'cancelled') {
+      Alert.alert(
+        "Action impossible",
+        "Le partage de factures pour des réservations annulées n'est pas autorisé.",
+        [{ text: "Compris" }]
+      );
+      return;
+    }
+    
     try {
       const message = `
 🧾 FACTURE TRAVELHUB 🧾
@@ -220,13 +242,22 @@ Statut: ✅ ${invoice.status}
                   {invoice.trip_details?.passenger_count > 1 ? 'Sièges:' : 'Siège:'}
                 </Text>
               </View>
-              <Text style={styles.tripValue}>
+              <Text style={[styles.tripValue, invoice.trip_details?.passenger_count > 1 && styles.multiSeatValue]}>
                 {invoice.trip_details?.seat_number}
-                {invoice.trip_details?.passenger_count > 1 && 
-                  ` (${invoice.trip_details.passenger_count} passagers)`
-                }
               </Text>
             </View>
+            
+            {invoice.trip_details?.passenger_count > 1 && (
+              <View style={styles.passengerInfoBox}>
+                <Ionicons name="people" size={18} color={COLORS.primary} />
+                <Text style={styles.passengerInfo}>
+                  {invoice.trip_details.passenger_count} passagers
+                </Text>
+                <Text style={styles.passengerPrice}>
+                  Prix par passager : {(invoice.total_amount / invoice.trip_details.passenger_count).toLocaleString()} {invoice.currency}
+                </Text>
+              </View>
+            )}
             <View style={styles.tripRow}>
               <View style={styles.tripLabelContainer}>
                 <Ionicons name="card-outline" size={16} color={COLORS.primary} />
@@ -468,6 +499,33 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flex: 1,
     textAlign: 'right',
+  },
+  multiSeatValue: {
+    fontWeight: 'bold',
+  },
+  passengerInfoBox: {
+    flexDirection: 'column',
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.sm,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
+    marginLeft: SPACING.lg,
+    marginRight: SPACING.sm,
+  },
+  passengerInfo: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: COLORS.text.primary,
+    marginBottom: SPACING.xs,
+    marginLeft: SPACING.sm,
+    marginTop: SPACING.xs,
+  },
+  passengerPrice: {
+    fontSize: 13,
+    color: COLORS.text.secondary,
+    marginLeft: SPACING.sm,
   },
   amountSection: {
     backgroundColor: COLORS.surface,

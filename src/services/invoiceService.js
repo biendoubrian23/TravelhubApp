@@ -23,6 +23,12 @@ export const invoiceService = {
     try {
       console.log('🧾 Création de la facture pour:', bookingData?.booking_reference);
       
+      // Vérifier si la réservation est annulée
+      if (bookingData.booking_status === 'cancelled') {
+        console.error('❌ Impossible de créer une facture pour une réservation annulée');
+        throw new Error("Les factures ne peuvent pas être générées pour les réservations annulées.");
+      }
+      
       // Générer un numéro de facture unique
       const invoiceNumber = this.generateInvoiceNumber();
       
@@ -134,7 +140,8 @@ export const invoiceService = {
       if (seats.length === 1) {
         return seats[0];
       } else if (seats.length > 1) {
-        return seats.join(', ');
+        // Pour les sièges multiples, les formater de façon claire
+        return seats.sort().join(', ');
       }
     }
     
@@ -531,6 +538,12 @@ export const invoiceService = {
               console.log('⚠️ Erreur récupération booking:', bookingError.message);
             } else if (bookingData) {
               console.log('✅ Booking récupéré:', bookingData);
+              
+              // Vérifier si la réservation est annulée
+              if (bookingData.booking_status === 'cancelled') {
+                console.log('⚠️ Réservation annulée, facture ignorée:', invoice.invoice_number);
+                continue; // Passer à la facture suivante
+              }
               
               // Deuxième requête : essayer de récupérer le trip si trip_id existe
               let tripData = null;
@@ -933,6 +946,31 @@ Référence: ${booking?.booking_reference}
     } catch (error) {
       console.error('❌ Erreur suppression facture:', error);
       return { error };
+    }
+  },
+
+  /**
+   * Vérifie si une réservation a déjà une facture associée
+   */
+  async checkInvoiceExists(bookingId) {
+    try {
+      if (!bookingId) return false;
+      
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('booking_id', bookingId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('❌ Erreur vérification facture existante:', error);
+        return false;
+      }
+
+      return !!data; // Retourne true si une facture existe déjà
+    } catch (error) {
+      console.error('❌ Erreur vérification facture:', error);
+      return false;
     }
   }
 };
