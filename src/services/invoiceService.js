@@ -972,5 +972,83 @@ Référence: ${booking?.booking_reference}
       console.error('❌ Erreur vérification facture:', error);
       return false;
     }
+  },
+  
+  /**
+   * Récupère une facture par ID de réservation et l'enrichit avec les données complètes
+   */
+  async getInvoiceByBookingId(bookingId) {
+    try {
+      if (!bookingId) return null;
+      
+      console.log('🔍 Recherche facture pour bookingId:', bookingId);
+      
+      // 1. Récupérer la facture de base
+      const { data: invoice, error } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('booking_id', bookingId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('❌ Erreur récupération facture par bookingId:', error);
+        return null;
+      }
+      
+      if (!invoice) {
+        console.log('⚠️ Aucune facture trouvée pour ce bookingId');
+        return null;
+      }
+      
+      console.log('✅ Facture trouvée:', invoice.invoice_number);
+      
+      // 2. Récupérer les données de base de la réservation
+      const { data: bookingData, error: bookingError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('id', bookingId)
+        .maybeSingle();
+        
+      if (bookingError) {
+        console.error('❌ Erreur récupération booking pour enrichissement:', bookingError);
+      } else if (bookingData) {
+        console.log('✅ Données booking récupérées pour enrichissement');
+        
+        // 3. Récupérer les données du voyage séparément si trip_id existe
+        let tripData = null;
+        if (bookingData.trip_id) {
+          const { data: trip, error: tripError } = await supabase
+            .from('trips')
+            .select('*')
+            .eq('id', bookingData.trip_id)
+            .maybeSingle();
+            
+          if (tripError) {
+            console.error('❌ Erreur récupération trip:', tripError);
+          } else if (trip) {
+            console.log('✅ Données trip récupérées pour enrichissement');
+            tripData = trip;
+          }
+        }
+        
+        // 4. Mettre à jour les informations manquantes dans la facture
+        invoice.trip_details = {
+          ...invoice.trip_details,
+          departure: tripData?.departure_city || bookingData.departure_city || bookingData.departure || invoice.trip_details?.departure || 'N/A',
+          arrival: tripData?.arrival_city || bookingData.arrival_city || bookingData.arrival || invoice.trip_details?.arrival || 'N/A',
+          date: tripData?.departure_date || bookingData.departure_date || bookingData.date || invoice.trip_details?.date,
+          time: tripData?.departure_time || bookingData.departure_time || bookingData.time || invoice.trip_details?.time,
+          bus_type: tripData?.bus_type || bookingData.bus_type || invoice.trip_details?.bus_type
+        };
+        
+        // Ajouter les données de réservation pour cohérence avec le format de createInvoice
+        invoice.bookings = bookingData;
+      }
+      
+      return invoice; // Retourne la facture enrichie
+    } catch (error) {
+      console.error('❌ Erreur récupération facture enrichie:', error);
+      return null;
+    }
   }
 };

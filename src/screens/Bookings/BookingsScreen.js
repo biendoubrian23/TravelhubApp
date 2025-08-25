@@ -186,8 +186,8 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
     }
   };
   
-  // Fonction pour créer une facture individuelle pour une réservation
-  const handleCreateInvoice = async (booking) => {
+  // Fonction pour gérer l'affichage ou la création d'une facture
+  const handleViewOrCreateInvoice = async (booking) => {
     // Vérifier si le billet est annulé
     if (booking.booking_status === 'cancelled') {
       Alert.alert(
@@ -207,55 +207,64 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
     }
     
     try {
+      // Afficher un indicateur de chargement
+      Alert.alert(
+        "Chargement",
+        "Recherche de votre facture...",
+        [{ text: "Patienter" }],
+        { cancelable: false }
+      );
+      
+      console.log('🔍 Recherche facture pour réservation:', booking.id, booking.booking_reference);
+      
       // Vérifier si une facture existe déjà
       const invoiceExists = await invoiceService.checkInvoiceExists(booking.id);
       
       if (invoiceExists) {
-        // Si une facture existe, proposer de voir la facture existante
-        Alert.alert(
-          "Facture existante",
-          "Une facture existe déjà pour cette réservation. Voulez-vous la consulter?",
-          [
-            { text: "Non", style: "cancel" },
-            { 
-              text: "Voir la facture", 
-              onPress: () => navigation.navigate('Invoices') 
-            }
-          ]
-        );
+        console.log('✅ Facture existante trouvée, récupération des détails');
+        // Si une facture existe, la récupérer et l'afficher directement
+        const invoice = await invoiceService.getInvoiceByBookingId(booking.id);
+        
+        if (invoice) {
+          console.log('📄 Affichage facture existante:', invoice.invoice_number);
+          // Naviguer directement vers l'aperçu de la facture
+          navigation.navigate('InvoicePreview', { invoice, booking });
+        } else {
+          Alert.alert(
+            "Erreur", 
+            "Impossible de récupérer la facture existante. Veuillez réessayer."
+          );
+        }
         return;
       }
       
-      // Montrer l'indicateur de chargement
+      console.log('⚠️ Aucune facture existante, création d\'une nouvelle');
+      // Montrer l'indicateur de chargement pour la création
       Alert.alert(
         "Création de facture",
         "Création de votre facture en cours...",
-        [{ text: "OK" }]
+        [{ text: "OK" }],
+        { cancelable: false }
       );
       
-      // Créer la facture
+      // Créer la facture en passant les données complètes de la réservation
       const invoice = await invoiceService.createInvoice(booking, user);
       
       if (invoice) {
-        Alert.alert(
-          "Facture créée",
-          "Votre facture a été créée avec succès. Voulez-vous la consulter maintenant?",
-          [
-            { text: "Plus tard", style: "cancel" },
-            { 
-              text: "Voir maintenant", 
-              onPress: () => navigation.navigate('InvoicePreview', { invoice }) 
-            }
-          ]
-        );
+        console.log('✅ Nouvelle facture créée:', invoice.invoice_number);
+        // Naviguer directement vers l'aperçu de la facture
+        navigation.navigate('InvoicePreview', { invoice, booking });
       } else {
         Alert.alert("Erreur", "Impossible de créer la facture. Veuillez réessayer.");
       }
     } catch (error) {
-      console.error("❌ Erreur création facture:", error);
-      Alert.alert("Erreur", "Une erreur est survenue lors de la création de la facture.");
+      console.error("❌ Erreur gestion facture:", error);
+      Alert.alert("Erreur", "Une erreur est survenue lors de la gestion de la facture: " + error.message);
     }
   };
+  
+  // Maintenir l'ancienne fonction pour compatibilité
+  const handleCreateInvoice = handleViewOrCreateInvoice;
 
   const renderBookingCard = (booking) => (
     <Card key={booking.id} style={{ marginBottom: SPACING.md, elevation: 2 }}>
@@ -407,7 +416,7 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
               <View style={{ flex: 1 }}>
                 <Button 
                   mode="contained" 
-                  onPress={() => handleCreateInvoice(booking)}
+                  onPress={() => handleViewOrCreateInvoice(booking)}
                   style={buttonStyle}
                   buttonColor={COLORS.secondary}
                   labelStyle={buttonLabelStyle}

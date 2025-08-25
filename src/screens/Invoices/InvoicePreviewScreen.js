@@ -14,19 +14,38 @@ import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
 import { Button } from '../../components';
 
 const InvoicePreviewScreen = ({ route, navigation }) => {
-  const { invoice } = route.params;
+  const { invoice, booking } = route.params;
+  
+  console.log('📄 Aperçu facture:', invoice?.invoice_number);
+  console.log('🧳 Données réservation disponibles:', !!booking);
+  
+  // Fusionner les données si booking est fourni
+  useEffect(() => {
+    if (booking && invoice) {
+      console.log('🔄 Enrichissement des données de facture avec réservation');
+      // S'assurer que les champs trip_details sont remplis
+      if (!invoice.trip_details?.departure || invoice.trip_details?.departure === 'N/A') {
+        invoice.trip_details = invoice.trip_details || {};
+        invoice.trip_details.departure = booking.trip?.departure_city || booking.departure_city || 'N/A';
+        invoice.trip_details.arrival = booking.trip?.arrival_city || booking.arrival_city || 'N/A';
+        invoice.trip_details.date = booking.trip?.departure_date || booking.date || invoice.trip_details?.date;
+        invoice.trip_details.time = booking.trip?.departure_time || booking.time || invoice.trip_details?.time;
+      }
+    }
+  }, [invoice, booking]);
 
   // Vérifier si la facture est liée à une réservation annulée
   useEffect(() => {
     // Vérifier si la réservation est annulée
-    if (invoice.bookings?.booking_status === 'cancelled') {
+    const isBookingCancelled = invoice.bookings?.booking_status === 'cancelled' || booking?.booking_status === 'cancelled';
+    if (isBookingCancelled) {
       Alert.alert(
         "Réservation annulée",
         "Cette facture est liée à une réservation annulée. Certaines fonctionnalités peuvent être limitées.",
         [{ text: "Compris" }]
       );
     }
-  }, [invoice]);
+  }, [invoice, booking]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Date invalide';
@@ -66,7 +85,8 @@ const InvoicePreviewScreen = ({ route, navigation }) => {
 
   const handleShare = async () => {
     // Vérifier si la réservation est annulée
-    if (invoice.bookings?.booking_status === 'cancelled') {
+    const isBookingCancelled = invoice.bookings?.booking_status === 'cancelled' || booking?.booking_status === 'cancelled';
+    if (isBookingCancelled) {
       Alert.alert(
         "Action impossible",
         "Le partage de factures pour des réservations annulées n'est pas autorisé.",
