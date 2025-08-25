@@ -126,7 +126,7 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
           tripId: trip?.id,
           userId: user?.id,
           seatNumber: selectedSeats && Array.isArray(selectedSeats) 
-            ? selectedSeats.map(seat => seat.seat_number || seat.number || seat).join(', ')
+            ? selectedSeats.map(seat => seat?.seat_number || seat?.number || seat || 'A1').join(', ')
             : (typeof selectedSeats === 'string' ? selectedSeats : 'A1'),
           totalPrice: totalPrice || 0,
           paymentMethod: paymentMethod || 'orange_money',
@@ -314,7 +314,7 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
           <View style={styles.bookingInfo}>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Référence</Text>
-              <Text style={styles.infoValue}>{booking.booking_reference}</Text>
+              <Text style={styles.infoValue}>{booking?.booking_reference || 'N/A'}</Text>
             </View>
             
             <View style={styles.infoRow}>
@@ -330,7 +330,7 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Date de réservation</Text>
               <Text style={styles.infoValue}>
-                {new Date(booking.created_at).toLocaleDateString('fr-FR')}
+                {booking?.created_at ? new Date(booking.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}
               </Text>
             </View>
           </View>
@@ -354,7 +354,7 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
               <View style={styles.tripDetail}>
                 <Ionicons name="calendar-outline" size={16} color={COLORS.text.secondary} />
                 <Text style={styles.tripDetailText}>
-                  {departureInfo.date} à {departureInfo.time}
+                  {departureInfo?.date || 'Date inconnue'} à {departureInfo?.time || 'Heure inconnue'}
                 </Text>
               </View>
               
@@ -385,7 +385,7 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
                 <View style={styles.seatHeader}>
                   <Ionicons name="airplane" size={20} color={COLORS.primary} />
                   <Text style={styles.seatNumber}>
-                    Siège {seat.seat_number || seat.number || 'A1'}
+                    Siège {seat?.seat_number || seat?.number || 'A1'}
                   </Text>
                 </View>
                 <Text style={styles.seatType}>{seat.seat_type || 'Standard'}</Text>

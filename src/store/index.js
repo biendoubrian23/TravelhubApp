@@ -377,71 +377,47 @@ export const useBookingsStore = create(devtools((set, get) => ({
           if (data && data.length > 0) {
             console.log('📋 Données brutes de Supabase:', data.length, 'réservations');
             
-            // Grouper les réservations par référence de réservation pour éviter les doublons visuels
-            const groupedBookings = data.reduce((groups, booking) => {
+            // 🚫 SUPPRESSION DU GROUPEMENT - Chaque réservation reste séparée
+            // Transformer chaque réservation individuellement (PAS de groupement)
+            const transformedBookings = data.map((booking) => {
               const trip = booking.trips || {};
               const agency = trip.agencies || {};
-              const bookingRef = booking.booking_reference || booking.id;
               
-              if (!groups[bookingRef]) {
-                groups[bookingRef] = {
-                  bookings: [],
-                  trip: trip,
-                  agency: agency
-                };
-              }
-              
-              groups[bookingRef].bookings.push(booking);
-              return groups;
-            }, {});
-            
-            console.log('� Groupes de réservations:', Object.keys(groupedBookings).length);
-            
-            // Transformer chaque groupe en une seule entrée UI
-            const transformedBookings = Object.entries(groupedBookings).map(([bookingRef, group]) => {
-              const firstBooking = group.bookings[0];
-              const trip = group.trip;
-              const agency = group.agency;
-              
-              // Calculer le prix total et combiner les numéros de siège
-              const totalPrice = group.bookings.reduce((sum, b) => sum + (b.total_price_fcfa || 0), 0);
-              const seatNumbers = group.bookings.map(b => b.seat_number).filter(s => s).sort((a, b) => a - b);
-              const seatDisplay = seatNumbers.length > 1 ? `${seatNumbers.join(', ')}` : seatNumbers[0] || 'N/A';
-              
-              console.log('🔄 Transformation groupe:', {
-                bookingRef: bookingRef,
-                nbSieges: group.bookings.length,
-                sieges: seatNumbers,
-                prixTotal: totalPrice,
+              console.log('🔄 Transformation individuelle:', {
+                bookingId: booking.id,
+                bookingRef: booking.booking_reference,
+                siege: booking.seat_number,
+                prix: booking.total_price_fcfa,
                 ville_depart: trip.ville_depart,
                 ville_arrivee: trip.ville_arrivee
               });
               
+              
               return {
-                id: firstBooking.id,
+                id: booking.id,
                 departure: trip.ville_depart || 'Ville inconnue',
                 arrival: trip.ville_arrivee || 'Ville inconnue', 
                 date: trip.date || new Date().toISOString().split('T')[0],
                 time: trip.heure_dep || '00:00',
-                price: totalPrice,
-                status: firstBooking.booking_status === 'confirmed' ? 'upcoming' : (firstBooking.booking_status || 'pending'),
+                price: booking.total_price_fcfa || 0, // Prix individuel de la réservation
+                status: booking.booking_status === 'confirmed' ? 'upcoming' : (booking.booking_status || 'pending'),
                 busType: trip.bus_type || 'standard',
                 agency: agency.nom || 'TravelHub',
-                seatNumber: seatDisplay,
-                seatNumbers: seatNumbers, // Array des numéros de siège
-                bookingDate: firstBooking.created_at,
-                bookingReference: bookingRef,
-                passengerName: firstBooking.passenger_name || 'Nom non défini',
-                passengerPhone: firstBooking.passenger_phone || 'Non défini',
-                paymentMethod: firstBooking.payment_method || 'Non spécifié',
-                paymentStatus: firstBooking.payment_status || 'pending',
+                seatNumber: booking.seat_number || 'N/A', // UN SEUL siège
+                seatNumbers: [booking.seat_number], // Array avec UN seul siège
+                bookingDate: booking.created_at,
+                bookingReference: booking.booking_reference,
+                passengerName: booking.passenger_name || 'Nom non défini',
+                passengerPhone: booking.passenger_phone || 'Non défini',
+                paymentMethod: booking.payment_method || 'Non spécifié',
+                paymentStatus: booking.payment_status || 'pending',
                 // Informations du trajet pour affichage détaillé
                 trip: trip,
-                trip_id: firstBooking.trip_id,
-                supabaseId: firstBooking.id, // ID de la BD
+                trip_id: booking.trip_id,
+                supabaseId: booking.id, // ID de la BD
                 syncedWithDB: true,
-                multiSeat: group.bookings.length > 1, // Indicateur multi-sièges
-                allBookingIds: group.bookings.map(b => b.id) // Tous les IDs de réservation
+                multiSeat: false, // Toujours false maintenant - chaque réservation est individuelle
+                allBookingIds: [booking.id] // Un seul ID par réservation
               };
             }).filter(booking => booking.id); // Filtrer les réservations sans ID
             

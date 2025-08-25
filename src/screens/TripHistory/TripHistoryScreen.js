@@ -111,9 +111,9 @@ const TripHistoryScreen = ({ navigation }) => {
       <View style={styles.bookingHeader}>
         <View style={styles.routeInfo}>
           <Text style={styles.routeText}>
-            {booking.departure} → {booking.arrival}
+            {(booking.departure || 'Départ')} → {(booking.arrival || 'Arrivée')}
           </Text>
-          <Text style={styles.agencyText}>{booking.agency}</Text>
+          <Text style={styles.agencyText}>{booking.agency || 'TravelHub'}</Text>
         </View>
         
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(booking.status) + '20' }]}>
@@ -133,22 +133,22 @@ const TripHistoryScreen = ({ navigation }) => {
           <View style={styles.detailItem}>
             <Ionicons name="calendar" size={16} color={COLORS.text.secondary} />
             <Text style={styles.detailText}>
-              {new Date(booking.date).toLocaleDateString('fr-FR', {
+              {booking.date ? new Date(booking.date).toLocaleDateString('fr-FR', {
                 day: '2-digit',
                 month: 'short',
                 year: 'numeric'
-              })}
+              }) : 'Date inconnue'}
             </Text>
           </View>
           
           <View style={styles.detailItem}>
             <Ionicons name="time" size={16} color={COLORS.text.secondary} />
-            <Text style={styles.detailText}>{booking.time}</Text>
+            <Text style={styles.detailText}>{booking.time || 'Heure inconnue'}</Text>
           </View>
           
           <View style={styles.detailItem}>
             <Ionicons name="stopwatch" size={16} color={COLORS.text.secondary} />
-            <Text style={styles.detailText}>{booking.duration}</Text>
+            <Text style={styles.detailText}>{booking.duration || 'N/A'}</Text>
           </View>
         </View>
 
@@ -157,27 +157,27 @@ const TripHistoryScreen = ({ navigation }) => {
             <Ionicons name="person" size={16} color={COLORS.text.secondary} />
             <Text style={styles.detailText}>
               {booking.multiSeat 
-                ? `Sièges ${booking.seatNumber}` 
-                : `Siège ${booking.seatNumber}`
+                ? `Sièges ${booking.seatNumber || 'N/A'}` 
+                : `Siège ${booking.seatNumber || 'N/A'}`
               }
             </Text>
           </View>
           
           <View style={styles.detailItem}>
             <Ionicons name="star" size={16} color={COLORS.text.secondary} />
-            <Text style={styles.detailText}>{booking.busType}</Text>
+            <Text style={styles.detailText}>{booking.busType || 'Standard'}</Text>
           </View>
           
           <View style={styles.detailItem}>
             <Ionicons name="card" size={16} color={COLORS.text.secondary} />
-            <Text style={styles.detailText}>{booking.paymentMethod}</Text>
+            <Text style={styles.detailText}>{booking.paymentMethod || 'Non spécifié'}</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.bookingFooter}>
-        <Text style={styles.bookingId}>#{booking.id}</Text>
-        <Text style={styles.priceText}>{booking.price.toLocaleString()} FCFA</Text>
+        <Text style={styles.bookingId}>#{booking.id || 'N/A'}</Text>
+        <Text style={styles.priceText}>{(booking.price || 0).toLocaleString()} FCFA</Text>
       </View>
 
       {booking.status === 'cancelled' && booking.cancelReason && (
