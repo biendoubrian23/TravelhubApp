@@ -28,6 +28,8 @@ const SeatSelectionScreen = ({ route, navigation }) => {
   
   const [selectedSeats, setSelectedSeats] = useState(preselectedOutboundSeats);
   const [returnSelectedSeats, setReturnSelectedSeats] = useState([]);
+  const [canScrollDown, setCanScrollDown] = useState(false);
+  const [scrollViewRef, setScrollViewRef] = useState(null);
   
   // Déterminer si c'est un aller-retour
   const isRoundTrip = outboundTrip && returnTrip;
@@ -310,6 +312,24 @@ const SeatSelectionScreen = ({ route, navigation }) => {
     return isSelected ? 'checkmark' : 'person-outline';
   };
 
+  // Fonction pour gérer le scroll et détecter s'il y a encore du contenu
+  const handleScroll = (event) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 20;
+    const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+    setCanScrollDown(!isCloseToBottom && contentSize.height > layoutMeasurement.height);
+  };
+
+  const handleScrollViewLayout = (event) => {
+    const { height } = event.nativeEvent.layout;
+    // Vérifier initialement s'il y a assez de contenu pour scroller
+    if (scrollViewRef) {
+      scrollViewRef.measure((x, y, width, contentHeight, pageX, pageY) => {
+        setCanScrollDown(contentHeight > height);
+      });
+    }
+  };
+
   const renderBusLayout = () => {
     if (loading && (!availableSeats || availableSeats.length === 0)) {
       return (
@@ -375,47 +395,118 @@ const SeatSelectionScreen = ({ route, navigation }) => {
         </View>
 
         {/* Sièges */}
-        <ScrollView style={styles.seatsScrollView} showsVerticalScrollIndicator={false}>
-          {sortedRows.map(({ rowNum, seats }) => (
-            <View key={rowNum} style={styles.seatRow}>
-              <Text style={styles.rowNumber}>{rowNum}</Text>
+        <View style={styles.seatsContainer}>
+          <ScrollView 
+            ref={setScrollViewRef}
+            style={styles.seatsScrollView} 
+            showsVerticalScrollIndicator={false}
+            onScroll={handleScroll}
+            onLayout={handleScrollViewLayout}
+            scrollEventThrottle={16}
+          >
+            {sortedRows.map(({ rowNum, seats }) => {
+              // Diviser les sièges en deux colonnes (gauche et droite) avec un espace central
+              const leftSeats = seats.filter(seat => seat.position_column <= 2);
+              const rightSeats = seats.filter(seat => seat.position_column > 2);
               
-              <View style={styles.seatsInRow}>
-                {seats.map((seat, index) => (
-                  <TouchableOpacity
-                    key={seat.id}
-                    style={[styles.seat, getSeatStyle(seat)]}
-                    onPress={() => handleSeatPress(seat)}
-                    disabled={!seat.is_available}
-                  >
-                    <Ionicons 
-                      name={getSeatIcon(seat)} 
-                      size={16} 
-                      color={
-                        selectedSeats.find(s => s.id === seat.id) 
-                          ? COLORS.text.white 
-                          : seat.is_available 
-                            ? COLORS.text.primary 
-                            : COLORS.text.secondary
-                      } 
-                    />
-                    <Text style={[
-                      styles.seatNumber,
-                      { color: selectedSeats.find(s => s.id === seat.id) 
-                          ? COLORS.text.white 
-                          : seat.is_available 
-                            ? COLORS.text.primary 
-                            : COLORS.text.secondary
-                      }
-                    ]}>
-                      {seat.seat_number}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              return (
+                <View key={rowNum} style={styles.seatRow}>
+                  <Text style={styles.rowNumber}>{rowNum}</Text>
+                  
+                  {/* Colonne gauche */}
+                  <View style={styles.leftColumn}>
+                    {leftSeats.map((seat, index) => (
+                      <TouchableOpacity
+                        key={seat.id}
+                        style={[styles.seat, getSeatStyle(seat)]}
+                        onPress={() => handleSeatPress(seat)}
+                        disabled={!seat.is_available}
+                      >
+                        <Ionicons 
+                          name={getSeatIcon(seat)} 
+                          size={16} 
+                          color={
+                            selectedSeats.find(s => s.id === seat.id) 
+                              ? COLORS.text.white 
+                              : seat.is_available 
+                                ? COLORS.text.white // Texte blanc sur fond orange
+                                : COLORS.text.secondary
+                          } 
+                        />
+                        <Text style={[
+                          styles.seatNumber,
+                          { color: selectedSeats.find(s => s.id === seat.id) 
+                              ? COLORS.text.white 
+                              : seat.is_available 
+                                ? COLORS.text.white // Texte blanc sur fond orange
+                                : COLORS.text.secondary
+                          }
+                        ]}>
+                          {seat.seat_number}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  
+                  {/* Espace central (couloir) avec indicateur visuel */}
+                  <View style={styles.centralAisle}>
+                    <View style={styles.aisleIndicator}>
+                      <View style={styles.aisleLine} />
+                      <Ionicons name="footsteps" size={12} color={COLORS.primary} />
+                      <View style={styles.aisleLine} />
+                    </View>
+                  </View>
+                  
+                  {/* Colonne droite */}
+                  <View style={styles.rightColumn}>
+                    {rightSeats.map((seat, index) => (
+                      <TouchableOpacity
+                        key={seat.id}
+                        style={[styles.seat, getSeatStyle(seat)]}
+                        onPress={() => handleSeatPress(seat)}
+                        disabled={!seat.is_available}
+                      >
+                        <Ionicons 
+                          name={getSeatIcon(seat)} 
+                          size={16} 
+                          color={
+                            selectedSeats.find(s => s.id === seat.id) 
+                              ? COLORS.text.white 
+                              : seat.is_available 
+                                ? COLORS.text.white // Texte blanc sur fond orange
+                                : COLORS.text.secondary
+                          } 
+                        />
+                        <Text style={[
+                          styles.seatNumber,
+                          { color: selectedSeats.find(s => s.id === seat.id) 
+                              ? COLORS.text.white 
+                              : seat.is_available 
+                                ? COLORS.text.white // Texte blanc sur fond orange
+                                : COLORS.text.secondary
+                          }
+                        ]}>
+                          {seat.seat_number}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+          
+          {/* Indicateur de scroll vers le bas */}
+          {canScrollDown && (
+            <View style={styles.scrollIndicator}>
+              <View style={styles.scrollIndicatorContent}>
+                <Ionicons name="chevron-down" size={16} color={COLORS.text.secondary} />
+                <Text style={styles.scrollIndicatorText}>Plus de sièges disponibles</Text>
+                <Ionicons name="chevron-down" size={16} color={COLORS.text.secondary} />
               </View>
             </View>
-          ))}
-        </ScrollView>
+          )}
+        </View>
       </View>
     );
   };
@@ -425,19 +516,21 @@ const SeatSelectionScreen = ({ route, navigation }) => {
       <Text style={styles.legendTitle}>Légende :</Text>
       <View style={styles.legendRow}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendSeat, styles.seatStandard]} />
-          <Text style={styles.legendText}>Standard</Text>
+          <View style={[styles.legendSeat, styles.seatSelected]}>
+            <Ionicons name="checkmark" size={12} color={COLORS.text.white} />
+          </View>
+          <Text style={styles.legendText}>Sélectionné</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendSeat, styles.seatPremium]} />
-          <Text style={styles.legendText}>Premium</Text>
+          <View style={[styles.legendSeat, styles.seatStandard]}>
+            <Ionicons name="person-outline" size={12} color={COLORS.text.white} />
+          </View>
+          <Text style={styles.legendText}>Disponible</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendSeat, styles.seatVip]} />
-          <Text style={styles.legendText}>VIP</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendSeat, styles.seatUnavailable]} />
+          <View style={[styles.legendSeat, styles.seatUnavailable]}>
+            <Ionicons name="close" size={12} color={COLORS.text.secondary} />
+          </View>
           <Text style={styles.legendText}>Occupé</Text>
         </View>
       </View>
@@ -850,6 +943,35 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   
+  seatsContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  
+  scrollIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    paddingVertical: SPACING.xs,
+  },
+  
+  scrollIndicatorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  scrollIndicatorText: {
+    fontSize: 12,
+    color: COLORS.text.secondary,
+    marginHorizontal: SPACING.xs,
+    fontStyle: 'italic',
+  },
+  
   seatRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -861,6 +983,57 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.text.secondary,
     textAlign: 'center',
+  },
+  
+  leftColumn: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end', // Rapprocher vers le centre (côté droit de la colonne gauche)
+    flex: 1,
+    paddingRight: 28, // Espace plus important pour voir la différence
+  },
+  
+  rightColumn: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start', // Rapprocher vers le centre (côté gauche de la colonne droite)
+    flex: 1,
+    paddingLeft: 28, // Espace plus important pour voir la différence
+  },
+  
+  centralAisle: {
+    width: 25, // Augmenter temporairement pour voir si ça change
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  aisleIndicator: {
+    height: 40,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  
+  aisleText: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
+  
+  aisleLine: {
+    width: 2,
+    height: 12,
+    backgroundColor: COLORS.primary,
+    opacity: 0.7,
+  },
+  
+  aisleDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: COLORS.text.secondary,
+    opacity: 0.4,
   },
   
   seatsInRow: {
@@ -876,30 +1049,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
+    marginHorizontal: 2, // Rapprocher les sièges dans chaque colonne
   },
   
   seatStandard: {
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.border,
+    backgroundColor: '#FF9800', // Orange pour les sièges disponibles
+    borderColor: '#F57C00',
   },
   
   seatPremium: {
-    backgroundColor: '#E3F2FD',
-    borderColor: '#2196F3',
+    backgroundColor: '#FF9800', // Orange pour les sièges disponibles
+    borderColor: '#F57C00',
   },
   
   seatVip: {
-    backgroundColor: '#FFF3E0',
-    borderColor: '#FF9800',
+    backgroundColor: '#FF9800', // Orange pour les sièges disponibles
+    borderColor: '#F57C00',
   },
   
   seatSelected: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.primary, // Bleu pour les sièges sélectionnés
     borderColor: COLORS.primary,
   },
   
   seatUnavailable: {
-    backgroundColor: '#EEEEEE',
+    backgroundColor: '#EEEEEE', // Gris pour les sièges occupés
     borderColor: '#BDBDBD',
   },
   
@@ -937,6 +1111,8 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 1,
     marginBottom: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   
   legendText: {
