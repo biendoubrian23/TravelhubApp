@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Calendar } from 'react-native-calendars'
-import { Button, Input, DataSourceIndicator } from '../../components'
+import { Button, Input } from '../../components'
 import { COLORS, SPACING, BORDER_RADIUS, CITIES } from '../../constants'
 import { useSearchStore } from '../../store'
 import { formatDate } from '../../utils/helpers'
@@ -176,22 +176,6 @@ const HomeScreen = ({ navigation }) => {
               </View>
               <Text style={styles.subtitle}>Voyagez facilement au Cameroun</Text>
             </View>
-
-            {/* Data Source Indicator */}
-            <DataSourceIndicator 
-              visible={__DEV__} 
-              onPress={() => navigation.navigate('RealDataTest')}
-            />
-
-            {/* Database Test Button - Development only */}
-            {__DEV__ && (
-              <TouchableOpacity
-                style={styles.devTestButton}
-                onPress={() => navigation.navigate('DatabaseTest')}
-              >
-                <Text style={styles.devTestButtonText}>🗄️ Test DB</Text>
-              </TouchableOpacity>
-            )}
 
             {/* Search Form */}
             <View style={styles.searchCard}>
@@ -779,22 +763,6 @@ const styles = StyleSheet.create({
 
   testButtonText: {
     fontSize: 20,
-  },
-
-  devTestButton: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    backgroundColor: COLORS.warning + '90',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.sm,
-  },
-
-  devTestButtonText: {
-    color: COLORS.text.white,
-    fontSize: 12,
-    fontWeight: 'bold',
   },
 })
 

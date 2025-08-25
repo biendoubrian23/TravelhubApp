@@ -24,7 +24,7 @@ const ProfileScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [userStats, setUserStats] = useState({
     totalBookings: 0,        // Nombre de réservations
-    referralsCount: 2,       // Nombre de parrainés (fixe pour le moment)
+    referralsCount: 0,       // Nombre de parrainés (dynamique)
     userCity: 'Douala',      // Ville de l'utilisateur
     memberSince: '',
   });
@@ -42,6 +42,7 @@ const ProfileScreen = ({ navigation }) => {
       let totalBookings = 0;
       let userCity = 'Douala'; // Valeur par défaut
       let fullName = '';
+      let referralsCount = 0; // Initialisation du compte de parrainages
       
       if (user?.id) {
         // 1. Charger le nombre de réservations depuis la base de données
@@ -54,6 +55,19 @@ const ProfileScreen = ({ navigation }) => {
         if (!bookingsError && bookings) {
           totalBookings = bookings.length;
           console.log(`📊 Utilisateur a ${totalBookings} réservations`);
+        }
+        
+        // 1.1. Charger le nombre de parrainages depuis la base de données
+        const { data: referrals, error: referralsError } = await supabase
+          .from('referrals')
+          .select('id')
+          .eq('referrer_id', user.id); // L'utilisateur est le parrain
+          
+        if (!referralsError && referrals) {
+          referralsCount = referrals.length;
+          console.log(`👥 Utilisateur a ${referralsCount} parrainages`);
+        } else if (referralsError) {
+          console.error('Erreur lors du chargement des parrainages:', referralsError);
         }
         
         // 2. Récupérer les informations utilisateur (nom et ville)
@@ -112,7 +126,7 @@ const ProfileScreen = ({ navigation }) => {
       
       setUserStats({
         totalBookings,
-        referralsCount: 2, // Fixe pour le moment, sera dynamique avec le système de parrainage
+        referralsCount, // Utilisation du nombre réel de parrainages récupéré de la base de données
         userCity,
         memberSince: user?.created_at ? new Date(user.created_at).getFullYear().toString() : '2025',
       });
@@ -295,57 +309,10 @@ const ProfileScreen = ({ navigation }) => {
         {/* Voyage */}
         <MenuSection title="Mes voyages">
           <MenuItem
-            icon="time"
-            title="Historique des voyages"
-            subtitle="Consultez vos trajets passés"
-            onPress={() => navigation.navigate('TripHistory')}
-          />
-          
-          <MenuItem
-            icon="heart"
-            title="Trajets favoris"
-            subtitle="Vos destinations préférées"
-            onPress={() => {
-              // Navigation vers l'onglet Favorites dans ClientMain
-              navigation.reset({
-                index: 0,
-                routes: [{ 
-                  name: 'ClientMain',
-                  state: {
-                    index: 2, // Index 2 correspond à l'onglet "Favorites"
-                    routes: [
-                      { name: 'Home' },
-                      { name: 'Bookings' },
-                      { name: 'Favorites' },
-                      { name: 'Profile' }
-                    ]
-                  }
-                }]
-              });
-            }}
-          />
-          
-          <MenuItem
             icon="receipt"
             title="Factures et reçus"
             subtitle="Téléchargez vos justificatifs"
             onPress={() => navigation.navigate('Invoices')}
-          />
-          
-          <MenuItem
-            icon="flask"
-            title="🧪 Créer facture test"
-            subtitle="Générer une facture de démonstration"
-            onPress={async () => {
-              try {
-                const { createTestInvoice } = await import('../../utils/testInvoices');
-                await createTestInvoice(user.id);
-                Alert.alert('Succès', 'Facture de test créée ! Consultez vos factures.');
-              } catch (error) {
-                Alert.alert('Erreur', 'Impossible de créer la facture de test');
-                console.error('Erreur test facture:', error);
-              }
-            }}
           />
         </MenuSection>
 
