@@ -417,14 +417,6 @@ const HomeScreen = ({ navigation }) => {
       </Modal>
 
       {renderPassengerModal()}
-      
-      {/* Bouton de test Realtime (temporaire) */}
-      <TouchableOpacity
-        style={styles.testButton}
-        onPress={() => navigation.navigate('RealtimeTest')}
-      >
-        <Text style={styles.testButtonText}>🧪</Text>
-      </TouchableOpacity>
     </SafeAreaView>
   )
 }
@@ -742,27 +734,6 @@ const styles = StyleSheet.create({
 
   passengerTextSelected: {
     color: COLORS.text.white,
-  },
-
-  testButton: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-
-  testButtonText: {
-    fontSize: 20,
   },
 })
 
