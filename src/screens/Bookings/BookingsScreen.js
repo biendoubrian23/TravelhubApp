@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, RefreshControl, Alert } from 'react-native';
+import { View, ScrollView, RefreshControl, Alert, Dimensions } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { 
   Text, 
@@ -16,6 +16,7 @@ import { COLORS, SPACING } from '../../constants';
 import { formatDate, formatPrice } from '../../utils/helpers';
 import { useBookingsStore, useAuthStore } from '../../store';
 import logger from '../../utils/logger';
+import { getResponsiveFontSize, getScreenType } from '../../utils/responsive';
 
 const BookingsScreen = ({ navigation: routeNavigation }) => {
   const { bookings, loadBookings, isLoading } = useBookingsStore();
@@ -224,24 +225,53 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
           marginBottom: SPACING.sm 
         }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <View>
-              <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>Agence</Text>
-              <Text style={{ fontWeight: '500', color: COLORS.text.primary }}>
+            <View style={{ flex: 1, marginRight: SPACING.xs }}>
+              <Text style={{ 
+                fontSize: getResponsiveFontSize('tiny'), 
+                color: COLORS.text.secondary 
+              }}>
+                Agence
+              </Text>
+              <Text style={{ 
+                fontWeight: '500', 
+                color: COLORS.text.primary,
+                fontSize: getResponsiveFontSize('small'),
+                numberOfLines: 1,
+                ellipsizeMode: 'tail'
+              }}>
                 {booking.trip.agency.name}
               </Text>
             </View>
-            <View>
-              <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>Siège</Text>
-              <Text style={{ fontWeight: '500', color: COLORS.text.primary }}>
+            <View style={{ flex: 0.6, marginRight: SPACING.xs, alignItems: 'center' }}>
+              <Text style={{ 
+                fontSize: getResponsiveFontSize('tiny'), 
+                color: COLORS.text.secondary 
+              }}>
+                Siège
+              </Text>
+              <Text style={{ 
+                fontWeight: '500', 
+                color: COLORS.text.primary,
+                fontSize: getResponsiveFontSize('small'),
+                numberOfLines: 1,
+                textAlign: 'center'
+              }}>
                 {booking.seat_number}
               </Text>
             </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>Prix</Text>
+            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+              <Text style={{ 
+                fontSize: getResponsiveFontSize('tiny'), 
+                color: COLORS.text.secondary 
+              }}>
+                Prix
+              </Text>
               <Text style={{ 
                 fontWeight: 'bold', 
-                fontSize: 16,
-                color: COLORS.primary 
+                fontSize: getResponsiveFontSize('medium'),
+                color: COLORS.primary,
+                numberOfLines: 1,
+                textAlign: 'right'
               }}>
                 {formatPrice(booking.total_price_fcfa)}
               </Text>

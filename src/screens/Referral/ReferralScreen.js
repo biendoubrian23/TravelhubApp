@@ -235,7 +235,7 @@ Mon code de parrainage : ${referralData.referralCode}
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* Header avec plus d'espace en haut */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -345,26 +345,26 @@ Mon code de parrainage : ${referralData.referralCode}
 
         {/* Liste des parrainages */}
         {referralData.referralsList.length > 0 && (
-          <View style={styles.referralsSection}>
-            <Text style={styles.sectionTitle}>Mes parrainages récents</Text>
-            {referralData.referralsList.slice(0, 5).map((referral, index) => (
-              <View key={referral.id} style={styles.referralItem}>
-                <View style={styles.referralInfo}>
-                  <Text style={styles.referralName}>
-                    {referral.users?.full_name || 'Utilisateur'}
-                  </Text>
-                  <Text style={styles.referralDate}>
-                    Inscrit le {formatDate(referral.created_at)}
-                  </Text>
+            <View style={styles.referralsSection}>
+              <Text style={styles.sectionTitle}>Mes parrainages récents</Text>
+              {referralData.referralsList.slice(0, 5).map((referral, index) => (
+                <View key={referral.id} style={styles.referralItem}>
+                  <View style={styles.referralInfo}>
+                    <Text style={styles.referralName}>
+                      {referral.users?.full_name || 'Utilisateur'}
+                    </Text>
+                    <Text style={styles.referralDate}>
+                      Inscrit le {formatDate(referral.created_at)}
+                    </Text>
+                  </View>
+                  <MaterialIcons
+                    name="check-circle"
+                    size={20}
+                    color={COLORS.success}
+                  />
                 </View>
-                <MaterialIcons
-                  name="check-circle"
-                  size={20}
-                  color={COLORS.success}
-                />
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
         )}
 
         {/* Espacement pour le bouton fixe */}
@@ -385,7 +385,7 @@ Mon code de parrainage : ${referralData.referralCode}
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA', // Gris très clair
+    backgroundColor: '#F3F4F6', // Gris clair comme dans l'image des notifications
   },
 
   loadingContainer: {
@@ -406,17 +406,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.lg,
-    backgroundColor: '#FAFAFA',
+    paddingTop: SPACING.xl, // Plus d'espace en haut
+    paddingBottom: SPACING.lg,
+    backgroundColor: '#F3F4F6', // Même couleur que le container
   },
 
   backButton: {
-    width: 40,
-    height: 40,
+    width: 44, // Légèrement plus grand pour être plus facile à toucher
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.08)',
   },
 
   headerTitle: {
@@ -434,11 +435,9 @@ const styles = StyleSheet.create({
 
   codeSection: {
     backgroundColor: COLORS.white,
-    marginHorizontal: SPACING.md,
-    marginTop: SPACING.md,
-    borderRadius: 12,
-    padding: SPACING.lg,
-    // Pas d'ombre ni de bordure
+    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.lg,
   },
 
   sectionTitle: {
@@ -491,8 +490,10 @@ const styles = StyleSheet.create({
   },
 
   statsSection: {
-    marginHorizontal: SPACING.md,
-    marginTop: SPACING.lg,
+    backgroundColor: COLORS.white,
+    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.lg,
   },
 
   statsGrid: {
@@ -502,11 +503,11 @@ const styles = StyleSheet.create({
 
   statCard: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: '#F8FAFC', // Fond légèrement différent pour les cartes
     borderRadius: 8,
     padding: SPACING.md,
     alignItems: 'center',
-    // Pas d'ombre ni de bordure
+    marginHorizontal: SPACING.xs,
   },
 
   statHeader: {
@@ -537,11 +538,9 @@ const styles = StyleSheet.create({
 
   howItWorksSection: {
     backgroundColor: COLORS.white,
-    marginHorizontal: SPACING.md,
-    marginTop: SPACING.lg,
-    borderRadius: 12,
-    padding: SPACING.lg,
-    // Pas d'ombre ni de bordure
+    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.lg,
   },
 
   stepsList: {
@@ -589,11 +588,9 @@ const styles = StyleSheet.create({
 
   referralsSection: {
     backgroundColor: COLORS.white,
-    marginHorizontal: SPACING.md,
-    marginTop: SPACING.lg,
-    borderRadius: 12,
-    padding: SPACING.lg,
-    // Pas d'ombre ni de bordure
+    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.lg,
   },
 
   referralItem: {
@@ -630,11 +627,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#F3F4F6', // Même couleur que le container
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.md,
     paddingBottom: SPACING.lg,
-    // Pas de bordure ni d'ombre
   },
 
   shareButton: {

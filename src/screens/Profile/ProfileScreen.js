@@ -296,27 +296,6 @@ const ProfileScreen = ({ navigation }) => {
             subtitle="Français"
             onPress={() => Alert.alert('Bientôt disponible', 'Cette fonctionnalité sera disponible prochainement')}
           />
-          
-          <MenuItem
-            icon="moon"
-            title="Thème"
-            subtitle="Clair, Sombre, Automatique"
-            onPress={() => Alert.alert('Bientôt disponible', 'Cette fonctionnalité sera disponible prochainement')}
-          />
-          
-          <MenuItem
-            icon="flask"
-            title="🧪 Test Réservations"
-            subtitle="Diagnostique du système de réservations"
-            onPress={() => navigation.navigate('ReservationTest')}
-          />
-          
-          <MenuItem
-            icon="person"
-            title="👤 Test Données Utilisateur"
-            subtitle="Diagnostique des données utilisateur"
-            onPress={() => navigation.navigate('UserDataTest')}
-          />
         </MenuSection>
 
         {/* Support */}

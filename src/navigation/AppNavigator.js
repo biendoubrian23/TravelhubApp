@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,6 +34,8 @@ import SplashScreen from '../screens/Auth/SplashScreen';
 import EditProfileScreen from '../screens/Profile/EditProfileScreen';
 import NotificationSettingsScreen from '../screens/Profile/NotificationSettingsScreen';
 import HelpSupportScreen from '../screens/Profile/HelpSupportScreen';
+import TermsConditionsScreen from '../screens/Profile/TermsConditionsScreen';
+import PrivacyPolicyScreen from '../screens/Profile/PrivacyPolicyScreen';
 // Temporairement désactivés
 // import AboutScreen from '../screens/Profile/AboutScreen';
 // import SecuritySettingsScreen from '../screens/Profile/SecuritySettingsScreen';
@@ -130,8 +132,22 @@ const AppNavigator = () => {
     userEmail: user?.email 
   });
 
+  // Thème de navigation forcé en mode clair
+  const lightNavigationTheme = {
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      primary: COLORS.primary,
+      background: COLORS.background,
+      card: COLORS.surface,
+      text: COLORS.text.primary,
+      border: COLORS.border,
+      notification: COLORS.accent,
+    },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={lightNavigationTheme}>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
@@ -202,6 +218,26 @@ const AppNavigator = () => {
               component={ReferralScreen}
               options={{
                 title: 'Parrainage',
+                presentation: 'card',
+                animationTypeForReplace: 'push',
+              }}
+            />
+
+            {/* Legal Screens */}
+            <Stack.Screen 
+              name="TermsConditions" 
+              component={TermsConditionsScreen}
+              options={{
+                title: 'Conditions d\'utilisation',
+                presentation: 'card',
+                animationTypeForReplace: 'push',
+              }}
+            />
+            <Stack.Screen 
+              name="PrivacyPolicy" 
+              component={PrivacyPolicyScreen}
+              options={{
+                title: 'Politique de confidentialité',
                 presentation: 'card',
                 animationTypeForReplace: 'push',
               }}

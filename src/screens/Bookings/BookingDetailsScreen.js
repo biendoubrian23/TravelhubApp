@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../../components';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
 import { useBookingsStore } from '../../store';
+import { getResponsiveFontSize, scaleFont } from '../../utils/responsive';
 
 const BookingDetailsScreen = ({ route, navigation }) => {
   const { bookingId } = route.params;
@@ -300,10 +301,14 @@ Bon voyage ! 🚌✨`,
 const DetailItem = ({ icon, label, value }) => (
   <View style={styles.detailItem}>
     <View style={styles.detailLeft}>
-      <Ionicons name={icon} size={16} color={COLORS.text.secondary} />
-      <Text style={styles.detailLabel}>{label}</Text>
+      <Ionicons name={icon} size={scaleFont(16)} color={COLORS.text.secondary} />
+      <Text style={[styles.detailLabel, { fontSize: getResponsiveFontSize('small') }]} numberOfLines={1}>
+        {label}
+      </Text>
     </View>
-    <Text style={styles.detailValue}>{value}</Text>
+    <Text style={[styles.detailValue, { fontSize: getResponsiveFontSize('small') }]} numberOfLines={1}>
+      {value}
+    </Text>
   </View>
 );
 
@@ -444,20 +449,27 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+    minHeight: 40, // Assurer une hauteur minimale
   },
   detailLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1, // Permettre l'expansion
+    marginRight: SPACING.sm, // Espace avant la valeur
   },
   detailLabel: {
     fontSize: 14,
     color: COLORS.text.secondary,
     marginLeft: SPACING.sm,
+    flexShrink: 1, // Permettre la réduction si nécessaire
   },
   detailValue: {
     fontSize: 14,
     fontWeight: '500',
     color: COLORS.text.primary,
+    textAlign: 'right', // Aligner à droite
+    flexShrink: 0, // Ne pas réduire la valeur
+    maxWidth: '60%', // Limiter la largeur pour éviter le débordement
   },
   priceContainer: {
     flexDirection: 'row',
