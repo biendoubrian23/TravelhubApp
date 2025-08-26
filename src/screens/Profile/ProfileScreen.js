@@ -297,6 +297,8 @@ const ProfileScreen = ({ navigation }) => {
         <BalanceCard 
           ref={balanceCardRef}
           style={{ marginHorizontal: SPACING.md, marginVertical: SPACING.sm }}
+          clickable={true}
+          onPress={() => navigation.navigate('BalanceHistory')}
         />
 
         {/* Compte */}

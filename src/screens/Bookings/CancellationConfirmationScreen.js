@@ -20,6 +20,7 @@ const CancellationConfirmationScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(false);
   const [cancellationInfo, setCancellationInfo] = useState(null);
   const [calculating, setCalculating] = useState(true);
+  const [lastClickTime, setLastClickTime] = useState(0); // Pour empêcher les clics multiples
 
   useEffect(() => {
     console.log('📋 useEffect CancellationConfirmation - booking reçu:', booking);
@@ -47,7 +48,15 @@ const CancellationConfirmationScreen = ({ route, navigation }) => {
   };
 
   const handleConfirmCancellation = async () => {
-    if (!cancellationInfo) return;
+    if (!cancellationInfo || loading) return; // Empêcher les clics si déjà en cours
+    
+    // Empêcher les clics multiples rapides
+    if (Date.now() - lastClickTime < 2000) {
+      console.log('⚠️ Clic trop rapide ignoré');
+      return;
+    }
+    
+    setLastClickTime(Date.now());
 
     Alert.alert(
       'Confirmer l\'annulation',
@@ -68,6 +77,12 @@ const CancellationConfirmationScreen = ({ route, navigation }) => {
     console.log('📋 Données booking:', booking);
     console.log('👤 Utilisateur actuel:', user);
     
+    // Éviter le double traitement
+    if (loading) {
+      console.log('⚠️ Annulation déjà en cours, ignoré');
+      return;
+    }
+    
     setLoading(true);
     try {
       const bookingId = booking.supabaseId || booking.id;
@@ -78,6 +93,7 @@ const CancellationConfirmationScreen = ({ route, navigation }) => {
       if (!bookingId || !userId) {
         console.error('❌ IDs manquants:', { bookingId, userId, booking, user });
         Alert.alert('Erreur', 'Impossible d\'identifier la réservation ou l\'utilisateur');
+        setLoading(false); // Important: réinitialiser loading en cas d'erreur
         return;
       }
 
@@ -104,11 +120,43 @@ const CancellationConfirmationScreen = ({ route, navigation }) => {
         );
       } else {
         console.error('❌ Échec annulation:', result.error);
-        Alert.alert('Erreur', result.error?.message || 'Impossible d\'annuler la réservation');
+        
+        // Gérer les cas d'erreur spécifiques
+        if (result.error?.code === 'DUPLICATE_CANCELLATION' || result.error?.code === 'DUPLICATE_TRANSACTION') {
+          // C'est une tentative de duplication, on peut afficher un message plus approprié
+          Alert.alert(
+            'Annulation déjà en cours',
+            'Votre demande d\'annulation est déjà en cours de traitement. Veuillez patienter.',
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.goBack()
+              }
+            ]
+          );
+        } else if (result.code === 'ALREADY_CANCELLED') {
+          // Réservation déjà annulée
+          Alert.alert(
+            'Déjà annulée',
+            'Cette réservation a déjà été annulée.',
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.goBack()
+              }
+            ]
+          );
+        } else {
+          // Autres erreurs
+          Alert.alert(
+            'Erreur',
+            result.error?.message || 'Impossible d\'annuler la réservation. Veuillez réessayer plus tard.'
+          );
+        }
       }
     } catch (error) {
       console.error('❌ Erreur processCancellation:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue lors de l\'annulation');
+      Alert.alert('Erreur', 'Une erreur est survenue lors de l\'annulation. Veuillez réessayer plus tard.');
     } finally {
       setLoading(false);
     }

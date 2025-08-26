@@ -784,15 +784,51 @@ export const bookingService = {
       const booking = await this.getBookingById(bookingId)
       
       // 2. Libérer les sièges
-      const seatNumbers = booking.seat_number.split(', ')
-      const { error: seatError } = await supabase
-        .from('seat_maps')
-        .update({ is_available: true })
-        .eq('trip_id', booking.trip_id)
-        .in('seat_number', seatNumbers)
-
-      if (seatError) {
-        console.error('Erreur lors de la libération des sièges:', seatError)
+      console.log('🔍 Annulation - Détails réservation:', booking);
+      console.log('- Type siège:', typeof booking.seat_number, booking.seat_number);
+      
+      let seatNumbers = [];
+      
+      if (booking.seat_number) {
+        // Gérer différentes représentations possibles des sièges
+        if (typeof booking.seat_number === 'string') {
+          // Si c'est une chaîne, vérifier si c'est une liste CSV ou un siège unique
+          if (booking.seat_number.includes(',')) {
+            seatNumbers = booking.seat_number.split(',').map(s => s.trim());
+          } else {
+            seatNumbers = [booking.seat_number.trim()];
+          }
+        } else if (typeof booking.seat_number === 'object') {
+          // Si c'est un objet/array (cas de {7}), le convertir en chaîne
+          seatNumbers = [String(booking.seat_number).replace(/[{}]/g, '')];
+        } else {
+          // Fallback
+          seatNumbers = [String(booking.seat_number)];
+        }
+      }
+      
+      console.log('🔓 Sièges à libérer:', seatNumbers);
+      
+      // S'assurer qu'on a des sièges à libérer
+      if (seatNumbers.length > 0) {
+        const { error: seatError, data: updatedSeats } = await supabase
+          .from('seat_maps')
+          .update({ is_available: true })
+          .eq('trip_id', booking.trip_id)
+          .in('seat_number', seatNumbers)
+          .select();
+          
+        console.log('✅ Mise à jour sièges:', { error: seatError, count: updatedSeats?.length || 0 });
+        
+        if (seatError) {
+          console.error('Erreur lors de la libération des sièges:', seatError);
+        } else if (updatedSeats && updatedSeats.length > 0) {
+          console.log('✅ Sièges libérés:', updatedSeats.map(s => s.seat_number).join(', '));
+        } else {
+          console.warn('⚠️ Aucun siège trouvé à libérer pour trip_id:', booking.trip_id, 'seat_numbers:', seatNumbers);
+        }
+      } else {
+        console.warn('⚠️ Aucun siège trouvé dans la réservation');
       }
 
       // 3. Mettre à jour le statut de la réservation
