@@ -159,7 +159,10 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+      >
         {/* Header and Search Form with Background Image */}
         <ImageBackground
           source={require('../../../assets/bus-background.jpg')}

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Animated,
   Easing,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,24 +15,33 @@ import { Button } from '../../components';
 import { useBookingsStore, useAuthStore } from '../../store';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
 import { bookingService } from '../../services';
+import { supabase } from '../../services/supabase';
 import logger from '../../utils/logger';
 
 const PaymentSuccessScreen = ({ route, navigation }) => {
   const { 
     booking, 
     trip, 
+    tripDetails,
+    tripId: routeTripId,
     selectedSeats, 
     totalPrice, 
     originalPrice,
     referralDiscount,
     discountApplied,
     rewardsToUse,
-    paymentMethod 
+    paymentMethod,
+    paymentType, // Nouveau: type de paiement (balance, mobile_money, card)
+    bookingReference, // Référence déjà créée pour les paiements non-solde
+    skipBookingCreation // Nouveau flag pour éviter de créer à nouveau les réservations
   } = route.params;
   const { user } = useAuthStore();
   
+  console.log('🔍 PaymentSuccessScreen - Type de paiement:', paymentType);
+  console.log('🔍 PaymentSuccessScreen - Référence existante:', bookingReference);
+  
   // État pour éviter la création multiple de réservations avec une clé unique
-  const tripId = trip?.id;
+  const tripId = trip?.id || tripDetails?.id || routeTripId;
   const userId = user?.id;
   
   // Inclure les sièges dans la clé pour éviter les conflits lors de réservations multiples
@@ -100,22 +110,101 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
       global.processedBookings.set(bookingKey, now);
       
       // Création de la réservation après confirmation de paiement
-
+      let savedBookings = [];
+      
       try {
-        // Préparer les données pour le service de réservation Supabase
-        const bookingData = {
-          tripId: trip?.id,
-          userId: user?.id,
-          seatNumber: selectedSeats && Array.isArray(selectedSeats) 
-            ? selectedSeats.map(seat => seat?.seat_number || seat?.number || seat || 'A1').join(', ')
-            : (typeof selectedSeats === 'string' ? selectedSeats : 'A1'),
-          totalPrice: totalPrice || 0,
-          paymentMethod: paymentMethod || 'orange_money',
-          selectedSeats: selectedSeats || []
-        };
+        // Vérifier le type de paiement pour déterminer la stratégie
+        if (paymentType === 'balance') {
+          // Paiement par solde : réservation déjà créée par balanceService
+          console.log('💰 Paiement par solde - réservation déjà créée');
+          
+          if (bookingReference) {
+            // Récupérer la réservation existante
+            const { data: existingBookings } = await supabase
+              .from('bookings')
+              .select('*')
+              .eq('booking_reference', bookingReference)
+              .order('created_at', { ascending: false });
+              
+            if (existingBookings && existingBookings.length > 0) {
+              savedBookings = existingBookings;
+              console.log('✅ Réservations solde trouvées:', savedBookings.length);
+            }
+          }
+        } else if (paymentType === 'mobile_money' || paymentType === 'card') {
+          // Paiement mobile/carte : réservation déjà créée par bookingService
+          console.log(`📱 Paiement ${paymentType} - réservation déjà créée`);
+          
+          if (bookingReference) {
+            // Récupérer la réservation existante
+            const { data: existingBookings } = await supabase
+              .from('bookings')
+              .select('*')
+              .eq('booking_reference', bookingReference)
+              .order('created_at', { ascending: false });
+              
+            if (existingBookings && existingBookings.length > 0) {
+              savedBookings = existingBookings;
+              console.log(`✅ Réservations ${paymentType} trouvées:`, savedBookings.length);
+            }
+          }
+        } else {
+          // Fallback : ancien système de simulation avec création de réservation
+          console.log('🔄 Fallback - création de réservation classique');
+          
+          // Ajoutons des logs pour debug
+          console.log('🔍 DEBUG selectedSeats:', selectedSeats);
+          console.log('- Type:', typeof selectedSeats);
+          console.log('- Array?:', Array.isArray(selectedSeats));
+          console.log('- Contenu:', JSON.stringify(selectedSeats));
+          
+          // Préparer les données pour le service de réservation Supabase
+          const bookingData = {
+            tripId: tripId,
+            userId: user?.id,
+            seatNumber: selectedSeats && Array.isArray(selectedSeats) 
+              ? selectedSeats.map(seat => {
+                  console.log('🪑 Mapping seat:', seat, 'Type:', typeof seat);
+                  if (typeof seat === 'object') {
+                    const seatNum = String(seat?.seat_number || seat?.number || seat?.id || seat);
+                    console.log('- Objet siège mappé vers:', seatNum);
+                    return seatNum;
+                  }
+                  const seatStr = String(seat);
+                  console.log('- Siège simple mappé vers:', seatStr);
+                  return seatStr;
+                }).join(', ')
+              : (typeof selectedSeats === 'string' ? selectedSeats : String(selectedSeats || 'ERR_NO_SEAT')),
+            totalPrice: totalPrice || 0,
+            paymentMethod: paymentMethod || 'orange_money',
+            selectedSeats: selectedSeats && Array.isArray(selectedSeats) 
+              ? selectedSeats.map(seat => {
+                  if (typeof seat === 'object') {
+                    return String(seat?.seat_number || seat?.number || seat?.id || seat);
+                  }
+                  return String(seat);
+                })
+              : [String(selectedSeats || 'ERR_NO_SEAT')]
+          };
+          
+          console.log('📋 BookingData créé:', bookingData);
+          
+          // Vérifier que les données nécessaires sont présentes
+          if (!bookingData.tripId || !bookingData.userId) {
+            logger.error('❌ Données manquantes:', { tripId: bookingData.tripId, userId: bookingData.userId });
+            Alert.alert('Erreur', 'Impossible de créer la réservation. Données manquantes.');
+            return;
+          }
 
-        // Utiliser createMultipleBookings pour créer une réservation par siège
-        const savedBookings = await bookingService.createMultipleBookings(bookingData);
+          // Utiliser createMultipleBookings pour créer une réservation par siège
+          const result = await bookingService.createMultipleBookings(bookingData);
+          
+          if (result.success && result.bookings) {
+            savedBookings = result.bookings;
+          } else {
+            throw new Error('Échec de la création des réservations');
+          }
+        }
         
         if (savedBookings && Array.isArray(savedBookings) && savedBookings.length > 0) {
           // Réservations sauvegardées dans Supabase

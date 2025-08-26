@@ -9,7 +9,8 @@ export const COLORS = {
     primary: '#1A1A1A',     // Noir pour le texte principal
     secondary: '#6B7280',    // Gris pour le texte secondaire
     light: '#9CA3AF',       // Gris clair
-    white: '#FFFFFF'
+    white: '#FFFFFF',
+    disabled: '#D1D5DB'     // Gris pour le texte désactivé
   },
   border: '#E5E7EB',        // Gris pour les bordures
   error: '#DC2626',         // Rouge pour les erreurs

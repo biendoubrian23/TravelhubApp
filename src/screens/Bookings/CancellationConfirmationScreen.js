@@ -94,9 +94,10 @@ const CancellationConfirmationScreen = ({ route, navigation }) => {
             {
               text: 'OK',
               onPress: () => {
-                // Retourner à l'écran précédent et forcer le rechargement
-                navigation.goBack();
-                // Optionnel: émettre un événement pour recharger les réservations
+                // Revenir à l'onglet Home tout en conservant la barre d'onglets
+                navigation.navigate('ClientMain', {
+                  screen: 'Home'
+                });
               }
             }
           ]

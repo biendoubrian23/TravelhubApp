@@ -8,6 +8,7 @@ import {
   Alert,
   TextInput,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,6 +36,9 @@ const PaymentScreen = ({ route, navigation }) => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [showMixedPaymentModal, setShowMixedPaymentModal] = useState(false);
+  const [remainingAmount, setRemainingAmount] = useState(0);
+  const [selectedMixedPaymentMethod, setSelectedMixedPaymentMethod] = useState(null);
   
   // États pour les formulaires de paiement
   const [cardNumber, setCardNumber] = useState('');
@@ -49,13 +53,183 @@ const PaymentScreen = ({ route, navigation }) => {
     logger.info('PaymentScreen - isRoundTrip:', isRoundTrip);
   }, []); // Exécuter seulement au montage du composant
 
-  // Helper function pour formater les prix
+  // Helper functions pour formater les prix et récupérer les infos méthodes
   const formatPrice = (price) => {
     if (price === null || price === undefined || isNaN(price)) return '0';
     return Number(price).toLocaleString();
   };
+  
+  const getPaymentMethodName = (methodId) => {
+    const method = paymentMethods.find(m => m.id === methodId);
+    return method ? method.name : methodId;
+  };
+  
+  // Fonction pour afficher les options de paiement mixte
+  const showMixedPaymentOptions = (amount) => {
+    setRemainingAmount(amount);
+    setSelectedMixedPaymentMethod(null);
+    setShowMixedPaymentModal(true);
+  };
+  
+  // Fonction pour traiter le paiement mixte
+  const handleMixedPayment = async () => {
+    if (!selectedMixedPaymentMethod) {
+      Alert.alert('Erreur', 'Veuillez sélectionner une méthode de paiement pour le montant restant.');
+      return;
+    }
+    
+    try {
+      setProcessing(true);
+      const { useAuthStore } = require('../../store');
+      const { balanceService } = require('../../services/balanceService');
+      const { user } = useAuthStore.getState();
+      
+      const bookingData = {
+        userId: user?.id,
+        tripId: trip?.id || outboundTrip?.id,
+        seatNumbers: selectedSeats.map(seat => seat.seat_number || seat.number),
+        totalPrice: totalPrice,
+        paymentMethod: selectedMixedPaymentMethod
+      };
+      
+      console.log('🔄 Traitement paiement mixte:', {
+        userId: bookingData.userId,
+        tripId: bookingData.tripId,
+        seatNumbers: bookingData.seatNumbers,
+        totalPrice: bookingData.totalPrice,
+        userBalance,
+        remainingAmount,
+        paymentMethod: selectedMixedPaymentMethod
+      });
+      
+      const result = await balanceService.processPaymentWithBalance(
+        bookingData.userId, 
+        bookingData.tripId, 
+        bookingData.seatNumbers, 
+        bookingData.totalPrice, 
+        bookingData.paymentMethod
+      );
+      
+      if (result.success) {
+        // Fermer le modal
+        setShowMixedPaymentModal(false);
+        
+        // Si tout le solde a été utilisé et qu'il reste un montant à payer
+        if (result.data.amountFromBalance > 0 && result.data.amountToPay > 0) {
+          // Continuer avec le paiement du montant restant
+          // Dans un cas réel, on dirigerait vers le processeur de paiement
+          Alert.alert(
+            'Solde appliqué',
+            `${result.data.amountFromBalance.toLocaleString()} FCFA ont été débités de votre solde. Veuillez procéder au paiement du montant restant (${result.data.amountToPay.toLocaleString()} FCFA) avec ${getPaymentMethodName(selectedMixedPaymentMethod)}.`,
+            [
+              {
+                text: 'Continuer',
+                onPress: () => {
+                  // Simuler un paiement réussi après un délai pour démonstration
+                  setTimeout(() => {
+                    navigation.navigate('PaymentSuccess', {
+                      bookingReference: result.data.bookingId,
+                      totalPrice,
+                      amountFromBalance: result.data.amountFromBalance,
+                      amountPaid: result.data.amountToPay,
+                      tripDetails: trip || outboundTrip,
+                      paymentMethod: `Solde (${result.data.amountFromBalance.toLocaleString()} FCFA) + ${getPaymentMethodName(selectedMixedPaymentMethod)}`,
+                      reservationDate: new Date().toISOString(),
+                      selectedSeats: bookingData.seatNumbers,
+                      tripId: bookingData.tripId,
+                      skipBookingCreation: true // Flag pour éviter de créer à nouveau les réservations
+                    });
+                  }, 2000);
+                }
+              }
+            ]
+          );
+        } else {
+          navigation.navigate('PaymentSuccess', {
+            bookingReference: result.data.bookingId,
+            totalPrice,
+            amountFromBalance: result.data.amountFromBalance,
+            amountPaid: result.data.amountToPay,
+            tripDetails: trip || outboundTrip,
+            paymentMethod: `Solde utilisateur`,
+            reservationDate: new Date().toISOString(),
+            selectedSeats: bookingData.seatNumbers,
+            tripId: bookingData.tripId,
+            skipBookingCreation: true // Flag pour éviter de créer à nouveau les réservations
+          });
+        }
+      } else {
+        Alert.alert('Erreur', 'Le paiement a échoué. Veuillez réessayer.');
+      }
+    } catch (error) {
+      console.error('❌ Erreur lors du paiement mixte:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors du paiement.');
+    } finally {
+      setProcessing(false);
+    }
+  };
 
+  // État pour stocker le solde utilisateur
+  const [userBalance, setUserBalance] = useState(0);
+  const [loadingBalance, setLoadingBalance] = useState(true);
+  const [canUseBalance, setCanUseBalance] = useState(false);
+  const [balanceToUse, setBalanceToUse] = useState(0);
+  
+  // Récupérer le solde de l'utilisateur
+  useEffect(() => {
+    const getUserBalance = async () => {
+      try {
+        // Importer dynamiquement le service de solde
+        const { balanceService } = require('../../services/balanceService');
+        const { useAuthStore } = require('../../store');
+        
+        const { user } = useAuthStore.getState();
+        if (!user?.id) {
+          setLoadingBalance(false);
+          return;
+        }
+        
+        const result = await balanceService.getUserBalance(user.id);
+        const balance = result.balance || 0;
+        setUserBalance(balance);
+        
+        // Déterminer si le solde peut être utilisé
+        const canUse = balance > 0;
+        setCanUseBalance(canUse);
+        
+        // Afficher le montant qui sera utilisé (soit tout le solde, soit juste le montant nécessaire)
+        const amountToUse = Math.min(balance, totalPrice);
+        setBalanceToUse(amountToUse);
+        
+        // Calculer le montant restant à payer après utilisation du solde
+        const remaining = Math.max(0, totalPrice - balance);
+        setRemainingAmount(remaining);
+        
+        console.log('📊 Solde utilisateur récupéré:', balance);
+        console.log('💰 Montant à utiliser:', amountToUse);
+        console.log('� Montant restant:', remaining);
+      } catch (error) {
+        console.error('❌ Erreur lors de la récupération du solde:', error);
+      } finally {
+        setLoadingBalance(false);
+      }
+    };
+    
+    getUserBalance();
+  }, [totalPrice]);
+  
   const paymentMethods = [
+    // Afficher l'option de solde seulement si l'utilisateur en a
+    ...(canUseBalance ? [{
+      id: 'balance',
+      name: 'Mon Solde',
+      icon: 'wallet',
+      color: '#059669', // Vert
+      backgroundColor: '#ECFDF5',
+      description: userBalance >= totalPrice 
+        ? `Solde suffisant: ${userBalance.toLocaleString()} FCFA` 
+        : `Solde partiel: ${userBalance.toLocaleString()} FCFA (reste: ${(totalPrice - userBalance).toLocaleString()} FCFA)`
+    }] : []),
     {
       id: 'orange_money',
       name: 'Orange Money',
@@ -88,7 +262,73 @@ const PaymentScreen = ({ route, navigation }) => {
       return;
     }
 
-    // Afficher le formulaire de paiement
+    // Paiement par solde - traitement spécial
+    if (selectedPaymentMethod === 'balance') {
+      if (userBalance >= totalPrice) {
+        // Solde suffisant - traitement direct
+        try {
+          setProcessing(true);
+          const { useAuthStore } = require('../../store');
+          const { balanceService } = require('../../services/balanceService');
+          const { user } = useAuthStore.getState();
+          
+          const bookingData = {
+            userId: user?.id,
+            tripId: trip?.id || outboundTrip?.id,
+            seatNumbers: selectedSeats.map(seat => seat.seat_number || seat.number),
+            totalPrice: totalPrice,
+            paymentMethod: 'balance'
+          };
+          
+          const result = await balanceService.processPaymentWithBalance(
+            bookingData.userId, 
+            bookingData.tripId, 
+            bookingData.seatNumbers, 
+            bookingData.totalPrice, 
+            bookingData.paymentMethod
+          );
+          
+          if (result.success) {
+            navigation.navigate('PaymentSuccess', {
+              bookingReference: result.data.bookingId,
+              totalPrice,
+              tripDetails: trip || outboundTrip,
+              paymentMethod: 'Solde utilisateur',
+              reservationDate: new Date().toISOString(),
+              selectedSeats: selectedSeats, // Ajouter les sièges sélectionnés
+              tripId: trip?.id || outboundTrip?.id,
+              paymentType: 'balance' // Identifier comme paiement par solde
+            });
+          } else {
+            Alert.alert('Erreur', 'Le paiement par solde a échoué. Veuillez réessayer.');
+          }
+        } catch (error) {
+          console.error('❌ Erreur paiement solde:', error);
+          Alert.alert('Erreur', 'Une erreur est survenue lors du paiement par solde.');
+        } finally {
+          setProcessing(false);
+        }
+      } else {
+        // Solde insuffisant - proposer paiement mixte
+        Alert.alert(
+          'Solde insuffisant',
+          `Votre solde actuel (${userBalance.toLocaleString()} FCFA) est insuffisant pour couvrir le montant total (${totalPrice.toLocaleString()} FCFA). Souhaitez-vous utiliser votre solde et payer le reste (${(totalPrice - userBalance).toLocaleString()} FCFA) avec un autre moyen de paiement?`,
+          [
+            {
+              text: 'Non',
+              style: 'cancel'
+            },
+            {
+              text: 'Oui, paiement mixte',
+              onPress: () => showMixedPaymentOptions(totalPrice - userBalance)
+            }
+          ]
+        );
+      }
+      return;
+    }
+
+    // Afficher le formulaire de paiement standard pour les autres méthodes
     setShowPaymentForm(true);
   };
 
@@ -96,7 +336,75 @@ const PaymentScreen = ({ route, navigation }) => {
     setProcessing(true);
 
     try {
-      // Validation selon le type de paiement
+      const { useAuthStore } = require('../../store');
+      const { user } = useAuthStore.getState();
+
+      // Gestion du paiement mixte (solde + autre méthode)
+      if (selectedPaymentMethod !== 'balance' && canUseBalance && userBalance > 0) {
+        // Si l'utilisateur a un solde mais a choisi une autre méthode, proposer le paiement mixte
+        const wantsToUseMixedPayment = await new Promise(resolve => {
+          Alert.alert(
+            'Utiliser votre solde?',
+            `Vous avez un solde de ${userBalance.toLocaleString()} FCFA. Souhaitez-vous l'utiliser pour réduire le montant à payer?`,
+            [
+              {
+                text: 'Non',
+                onPress: () => resolve(false)
+              },
+              {
+                text: 'Oui, utiliser mon solde',
+                onPress: () => resolve(true)
+              }
+            ]
+          );
+        });
+        
+        if (wantsToUseMixedPayment) {
+          // Implémenter la logique de paiement mixte
+          try {
+            const { balanceService } = require('../../services/balanceService');
+            
+            const bookingData = {
+              userId: user?.id,
+              tripId: trip?.id || outboundTrip?.id,
+              seatNumbers: selectedSeats.map(seat => seat.seat_number || seat.number),
+              totalPrice: totalPrice,
+              paymentMethod: selectedPaymentMethod,
+              useBalance: true
+            };
+            
+            const result = await balanceService.processPaymentWithBalance(
+              bookingData.userId, 
+              bookingData.tripId, 
+              bookingData.seatNumbers, 
+              bookingData.totalPrice, 
+              bookingData.paymentMethod
+            );
+            
+            if (result.success) {
+              // Si le paiement mixte a réussi
+              navigation.navigate('PaymentSuccess', {
+                bookingReference: result.data.bookingId,
+                totalPrice,
+                amountFromBalance: result.data.amountFromBalance,
+                amountPaid: result.data.amountToPay,
+                tripDetails: trip || outboundTrip,
+                paymentMethod: `Solde (${result.data.amountFromBalance.toLocaleString()} FCFA) + ${getPaymentMethodName(selectedPaymentMethod)}`,
+                reservationDate: new Date().toISOString(),
+                selectedSeats: selectedSeats, // Ajouter les sièges sélectionnés
+                tripId: trip?.id || outboundTrip?.id,
+                paymentType: 'balance' // Paiement mixte utilise aussi le système de solde
+              });
+              return;
+            }
+          } catch (error) {
+            console.error('❌ Erreur paiement mixte:', error);
+            Alert.alert('Erreur', 'Une erreur est survenue lors du paiement mixte.');
+          }
+        }
+      }
+      
+      // Validation selon le type de paiement standard
       if (selectedPaymentMethod === 'card') {
         if (!cardNumber || !expiryDate || !cvv || !cardName) {
           Alert.alert('Erreur', 'Veuillez remplir tous les champs de la carte');
@@ -110,73 +418,119 @@ const PaymentScreen = ({ route, navigation }) => {
           return;
         }
         
-        // Pour les paiements mobiles, simuler directement le succès
-        // Simuler le traitement du paiement
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Créer une réservation factice pour le succès
-        const mockBooking = {
-          booking_reference: `TH${Date.now()}`,
-          booking_status: 'confirmed',
-          payment_status: 'completed',
-          total_price_fcfa: totalPrice,
-          original_price_fcfa: originalPrice,
-          referral_discount_fcfa: referralDiscount,
-          discount_applied: discountApplied,
-          rewards_used: rewardsToUse,
-          trip: trip,
-          selectedSeats: selectedSeats,
-          payment_method: selectedPaymentMethod === 'orange_money' ? 'orange_money' : 'mtn_momo'
-        };
-
-        // Fermer le modal et rediriger vers l'écran de succès
-        setShowPaymentForm(false);
-        navigation.replace('PaymentSuccess', {
-          booking: mockBooking,
-          trip: trip,
-          selectedSeats: selectedSeats,
-          totalPrice: totalPrice,
-          originalPrice: originalPrice,
-          referralDiscount: referralDiscount,
-          discountApplied: discountApplied,
-          rewardsToUse: rewardsToUse,
-          paymentMethod: mockBooking.payment_method
-        });
+        // Traitement du paiement mobile avec création de réservation réelle
+        try {
+          const { bookingService } = require('../../services/bookingService');
+          
+          // DEBUG: Analyser les sièges sélectionnés
+          console.log('🔍 DEBUGGING MOBILE PAYMENT - Sièges sélectionnés:');
+          console.log('- selectedSeats brut:', selectedSeats);
+          console.log('- Type selectedSeats:', typeof selectedSeats);
+          console.log('- Array?:', Array.isArray(selectedSeats));
+          console.log('- Contenu JSON:', JSON.stringify(selectedSeats, null, 2));
+          
+          // Mapper les sièges sélectionnés de façon sécurisée
+          let mappedSeats = [];
+          if (Array.isArray(selectedSeats)) {
+            mappedSeats = selectedSeats.map(seat => {
+              const seatNumber = seat.seat_number || seat.number || seat;
+              console.log(`- Mapping seat:`, seat, '→', seatNumber, `(${typeof seatNumber})`);
+              return String(seatNumber);
+            });
+          } else if (selectedSeats) {
+            // Si ce n'est pas un array mais qu'il y a une valeur
+            const seatNumber = selectedSeats.seat_number || selectedSeats.number || selectedSeats;
+            console.log(`- Mapping single seat:`, selectedSeats, '→', seatNumber, `(${typeof seatNumber})`);
+            mappedSeats = [String(seatNumber)];
+          } else {
+            console.error('❌ Aucun siège sélectionné trouvé');
+            Alert.alert('Erreur', 'Aucun siège sélectionné');
+            setProcessing(false);
+            return;
+          }
+          
+          console.log('🎯 Sièges mappés final:', mappedSeats);
+          
+          // Simuler le traitement du paiement mobile
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Créer les réservations dans la base de données
+          const bookingData = {
+            userId: user?.id,
+            tripId: trip?.id || outboundTrip?.id,
+            seatNumbers: mappedSeats,
+            totalPrice: totalPrice,
+            paymentMethod: selectedPaymentMethod === 'orange_money' ? 'orange_money' : 'mtn_momo',
+            phoneNumber: phoneNumber
+          };
+          
+          console.log('🚀 Création réservation Mobile Money:', bookingData);
+          
+          const result = await bookingService.createMultipleBookings(bookingData);
+          
+          if (result.success) {
+            // Fermer le modal et rediriger vers l'écran de succès
+            setShowPaymentForm(false);
+            navigation.replace('PaymentSuccess', {
+              bookingReference: result.bookingReference,
+              totalPrice: totalPrice,
+              tripDetails: trip || outboundTrip,
+              paymentMethod: selectedPaymentMethod === 'orange_money' ? 'Orange Money' : 'MTN Mobile Money',
+              reservationDate: new Date().toISOString(),
+              selectedSeats: selectedSeats,
+              tripId: trip?.id || outboundTrip?.id,
+              paymentType: 'mobile_money' // Identifier le type de paiement
+            });
+          } else {
+            Alert.alert('Erreur', 'La création de la réservation a échoué. Veuillez réessayer.');
+          }
+        } catch (error) {
+          console.error('❌ Erreur paiement mobile:', error);
+          Alert.alert('Erreur', 'Une erreur est survenue lors du paiement mobile.');
+        }
         return;
       }
 
       // Pour les cartes bancaires, continuer avec la logique normale
-      // Simuler le traitement du paiement
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      try {
+        const { bookingService } = require('../../services/bookingService');
+        
+        // Simuler le traitement du paiement par carte
+        await new Promise(resolve => setTimeout(resolve, 3000));
 
-      // Créer une réservation factice pour le succès
-      const mockBooking = {
-        booking_reference: `TH${Date.now()}`,
-        booking_status: 'confirmed',
-        payment_status: 'completed',
-        total_price_fcfa: totalPrice,
-        original_price_fcfa: originalPrice,
-        referral_discount_fcfa: referralDiscount,
-        discount_applied: discountApplied,
-        rewards_used: rewardsToUse,
-        trip: trip,
-        selectedSeats: selectedSeats,
-        payment_method: 'stripe'
-      };
-
-      // Fermer le modal et rediriger vers l'écran de succès
-      setShowPaymentForm(false);
-      navigation.replace('PaymentSuccess', {
-        booking: mockBooking,
-        trip: trip,
-        selectedSeats: selectedSeats,
-        totalPrice: totalPrice,
-        originalPrice: originalPrice,
-        referralDiscount: referralDiscount,
-        discountApplied: discountApplied,
-        rewardsToUse: rewardsToUse,
-        paymentMethod: mockBooking.payment_method
-      });
+        // Créer les réservations dans la base de données
+        const bookingData = {
+          userId: user?.id,
+          tripId: trip?.id || outboundTrip?.id,
+          seatNumbers: selectedSeats.map(seat => seat.seat_number || seat.number),
+          totalPrice: totalPrice,
+          paymentMethod: 'stripe'
+        };
+        
+        console.log('🚀 Création réservation Carte:', bookingData);
+        
+        const result = await bookingService.createMultipleBookings(bookingData);
+        
+        if (result.success) {
+          // Fermer le modal et rediriger vers l'écran de succès
+          setShowPaymentForm(false);
+          navigation.replace('PaymentSuccess', {
+            bookingReference: result.bookingReference,
+            totalPrice: totalPrice,
+            tripDetails: trip || outboundTrip,
+            paymentMethod: 'Carte bancaire',
+            reservationDate: new Date().toISOString(),
+            selectedSeats: selectedSeats,
+            tripId: trip?.id || outboundTrip?.id,
+            paymentType: 'card' // Identifier le type de paiement
+          });
+        } else {
+          Alert.alert('Erreur', 'La création de la réservation a échoué. Veuillez réessayer.');
+        }
+      } catch (error) {
+        console.error('❌ Erreur paiement carte:', error);
+        Alert.alert('Erreur', 'Une erreur est survenue lors du paiement par carte.');
+      }
 
     } catch (error) {
       Alert.alert('Erreur', 'Le paiement a échoué. Veuillez réessayer.');
@@ -388,7 +742,8 @@ const PaymentScreen = ({ route, navigation }) => {
                 >
                   <View style={[
                     styles.paymentMethodIcon,
-                    { backgroundColor: method.backgroundColor || method.color + '20' }
+                    { backgroundColor: method.backgroundColor || method.color + '20' },
+                    method.id === 'balance' && { borderWidth: 1, borderColor: COLORS.success + '30' }
                   ]}>
                     <Ionicons 
                       name={method.icon} 
@@ -564,13 +919,148 @@ const PaymentScreen = ({ route, navigation }) => {
           </View>
         </SafeAreaView>
       </Modal>
+      
+      {/* Modal pour le paiement mixte */}
+      <Modal
+        visible={showMixedPaymentModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          {/* Header du modal */}
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowMixedPaymentModal(false)}>
+              <Ionicons name="close" size={24} color={COLORS.text.primary} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Paiement mixte</Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          <ScrollView style={styles.modalContent}>
+            {/* Information sur le paiement mixte */}
+            <View style={styles.mixedPaymentInfo}>
+              <View style={styles.mixedPaymentHeader}>
+                <Ionicons name="wallet" size={24} color={COLORS.success} />
+                <Text style={styles.mixedPaymentTitle}>Votre solde est appliqué</Text>
+              </View>
+              
+              <View style={styles.mixedPaymentDetails}>
+                <View style={styles.mixedPaymentRow}>
+                  <Text style={styles.mixedPaymentLabel}>Solde utilisé:</Text>
+                  <Text style={styles.mixedPaymentValueGreen}>
+                    {userBalance.toLocaleString()} FCFA
+                  </Text>
+                </View>
+                
+                <View style={styles.mixedPaymentRow}>
+                  <Text style={styles.mixedPaymentLabel}>Montant restant:</Text>
+                  <Text style={styles.mixedPaymentValue}>
+                    {remainingAmount.toLocaleString()} FCFA
+                  </Text>
+                </View>
+                
+                <View style={styles.mixedPaymentRow}>
+                  <Text style={styles.mixedPaymentLabelTotal}>Total:</Text>
+                  <Text style={styles.mixedPaymentValueTotal}>
+                    {totalPrice.toLocaleString()} FCFA
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Sélection des méthodes de paiement pour le montant restant */}
+            <View style={styles.mixedPaymentMethodsSection}>
+              <Text style={styles.mixedPaymentMethodsTitle}>
+                Choisissez un moyen de paiement pour le montant restant
+              </Text>
+              
+              {/* Liste des méthodes de paiement (sans l'option solde) */}
+              <View style={styles.mixedPaymentMethods}>
+                {paymentMethods
+                  .filter(method => method.id !== 'balance')
+                  .map(method => (
+                    <TouchableOpacity
+                      key={method.id}
+                      style={[
+                        styles.paymentMethod,
+                        selectedMixedPaymentMethod === method.id && styles.selectedPaymentMethod,
+                        selectedMixedPaymentMethod === method.id && { borderColor: method.color, backgroundColor: method.backgroundColor }
+                      ]}
+                      onPress={() => setSelectedMixedPaymentMethod(method.id)}
+                    >
+                      <View style={[
+                        styles.paymentMethodIcon,
+                        { backgroundColor: method.backgroundColor || method.color + '20' }
+                      ]}>
+                        <Ionicons 
+                          name={method.icon} 
+                          size={24} 
+                          color={selectedMixedPaymentMethod === method.id ? method.color : method.color} 
+                        />
+                      </View>
+                      
+                      <View style={styles.paymentMethodInfo}>
+                        <Text style={[
+                          styles.paymentMethodName,
+                          selectedMixedPaymentMethod === method.id && { color: method.color, fontWeight: '600' }
+                        ]}>
+                          {method.name}
+                        </Text>
+                        <Text style={[
+                          styles.paymentMethodDescription,
+                          selectedMixedPaymentMethod === method.id && { color: method.color, opacity: 0.8 }
+                        ]}>
+                          {method.description}
+                        </Text>
+                      </View>
+                      
+                      <View style={styles.radioContainer}>
+                        <View style={[
+                          styles.radio,
+                          selectedMixedPaymentMethod === method.id && { borderColor: method.color, borderWidth: 3 }
+                        ]}>
+                          {selectedMixedPaymentMethod === method.id && (
+                            <View style={[styles.radioInner, { backgroundColor: method.color }]} />
+                          )}
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+              </View>
+            </View>
+          </ScrollView>
+          
+          {/* Footer avec bouton de paiement */}
+          <View style={styles.modalFooter}>
+            {processing ? (
+              <View style={styles.processingContainer}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+                <Text style={styles.processingText}>Traitement en cours...</Text>
+              </View>
+            ) : (
+              <Button 
+                title={`Payer ${remainingAmount.toLocaleString()} FCFA`}
+                onPress={handleMixedPayment}
+                disabled={!selectedMixedPaymentMethod}
+              />
+            )}
+          </View>
+        </SafeAreaView>
+      </Modal>
 
       {/* Footer avec bouton de paiement */}
       <View style={styles.footer}>
         <Button
-          title={`Payer ${formatPrice(totalPrice)} FCFA`}
+          title={selectedPaymentMethod === 'balance' 
+            ? userBalance >= totalPrice 
+              ? `Payer ${formatPrice(totalPrice)} FCFA avec mon solde` 
+              : `Payer ${formatPrice(totalPrice)} FCFA (solde: ${formatPrice(userBalance)})`
+            : `Payer ${formatPrice(totalPrice)} FCFA`
+          }
           onPress={handlePayment}
           disabled={!selectedPaymentMethod}
+          style={selectedPaymentMethod === 'balance' ? styles.balanceButton : {}}
+          color={selectedPaymentMethod === 'balance' ? COLORS.success : COLORS.primary}
         />
       </View>
     </SafeAreaView>
@@ -1011,11 +1501,95 @@ const styles = StyleSheet.create({
     color: COLORS.success,
   },
 
+  // Styles pour le paiement mixte
+  mixedPaymentInfo: {
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  
+  mixedPaymentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  
+  mixedPaymentTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: SPACING.sm,
+    color: COLORS.success,
+  },
+  
+  mixedPaymentDetails: {
+    backgroundColor: COLORS.success + '08',
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.success + '20',
+  },
+  
+  mixedPaymentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.sm,
+  },
+  
+  mixedPaymentLabel: {
+    fontSize: 14,
+    color: COLORS.text.secondary,
+  },
+  
+  mixedPaymentLabelTotal: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text.primary,
+  },
+  
+  mixedPaymentValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.text.primary,
+  },
+  
+  mixedPaymentValueGreen: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.success,
+  },
+  
+  mixedPaymentValueTotal: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  
+  mixedPaymentMethodsSection: {
+    marginTop: SPACING.md,
+  },
+  
+  mixedPaymentMethodsTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: COLORS.text.primary,
+    marginBottom: SPACING.md,
+  },
+  
+  mixedPaymentMethods: {
+    gap: SPACING.sm,
+  },
+
   modalFooter: {
     padding: SPACING.md,
     backgroundColor: COLORS.surface,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
+  },
+  
+  balanceButton: {
+    backgroundColor: COLORS.success,
+    borderColor: COLORS.success,
   },
 });
 

@@ -471,8 +471,12 @@ export const useBookingsStore = create(devtools((set, get) => ({
                 status: booking.booking_status === 'confirmed' ? 'upcoming' : (booking.booking_status || 'pending'),
                 busType: trip.bus_type || 'standard',
                 agency: agency.nom || 'TravelHub',
-                seatNumber: booking.seat_number || 'N/A', // UN SEUL siège
-                seatNumbers: [booking.seat_number], // Array avec UN seul siège
+                seatNumber: typeof booking.seat_number === 'object' ? 
+                  (booking.seat_number?.seat_number || booking.seat_number?.number || String(booking.seat_number) || 'N/A') :
+                  String(booking.seat_number || 'N/A'), // S'assurer que c'est une chaîne
+                seatNumbers: [typeof booking.seat_number === 'object' ? 
+                  (booking.seat_number?.seat_number || booking.seat_number?.number || String(booking.seat_number) || 'N/A') :
+                  String(booking.seat_number || 'N/A')], // Array avec UN seul siège (chaîne)
                 bookingDate: booking.created_at,
                 bookingReference: booking.booking_reference,
                 passengerName: booking.passenger_name || 'Nom non défini',
@@ -485,7 +489,11 @@ export const useBookingsStore = create(devtools((set, get) => ({
                 supabaseId: booking.id, // ID de la BD
                 syncedWithDB: true,
                 multiSeat: false, // Toujours false maintenant - chaque réservation est individuelle
-                allBookingIds: [booking.id] // Un seul ID par réservation
+                allBookingIds: [booking.id], // Un seul ID par réservation
+                // 🔧 CORRECTION: S'assurer que seat_number est toujours une chaîne
+                seat_number: typeof booking.seat_number === 'object' ? 
+                  (booking.seat_number?.seat_number || booking.seat_number?.number || String(booking.seat_number) || 'N/A') :
+                  String(booking.seat_number || 'N/A')
               };
             }).filter(booking => booking.id); // Filtrer les réservations sans ID
             

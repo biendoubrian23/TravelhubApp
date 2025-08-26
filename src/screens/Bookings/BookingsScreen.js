@@ -407,7 +407,22 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
                 numberOfLines: 1,
                 textAlign: 'center'
               }}>
-                {booking.seat_number}
+                {(() => {
+                  const seatNumber = booking.seat_number;
+                  
+                  // Si c'est un objet, extraire la valeur
+                  if (typeof seatNumber === 'object' && seatNumber !== null) {
+                    // Si c'est un array, prendre le premier élément
+                    if (Array.isArray(seatNumber)) {
+                      return String(seatNumber[0] || 'N/A');
+                    }
+                    // Si c'est un objet avec des propriétés
+                    return String(seatNumber.seat_number || seatNumber.number || seatNumber.id || Object.values(seatNumber)[0] || 'N/A');
+                  }
+                  
+                  // Si c'est déjà une chaîne ou un nombre
+                  return String(seatNumber || 'N/A');
+                })()}
               </Text>
             </View>
             <View style={{ flex: 1, alignItems: 'flex-end' }}>

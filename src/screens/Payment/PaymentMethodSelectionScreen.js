@@ -32,13 +32,17 @@ const PaymentMethodSelectionScreen = ({ route, navigation }) => {
 
     setLoading(true);
     try {
+      console.log('🔄 Chargement méthodes paiement pour user:', user.id, 'montant:', totalPrice);
       const result = await paymentService.getAvailablePaymentMethods(user.id, totalPrice);
+      console.log('📊 Méthodes reçues:', result);
+      
       setPaymentMethods(result.methods);
       setBreakdown(result.breakdown);
       
-      // Sélectionner automatiquement la première méthode disponible
+      // Sélectionner automatiquement la première méthode disponible (priorité au solde)
       if (result.methods.length > 0) {
-        setSelectedMethod(result.methods[0]);
+        const balanceMethod = result.methods.find(m => m.id.includes('balance'));
+        setSelectedMethod(balanceMethod || result.methods[0]);
       }
     } catch (error) {
       console.error('Erreur chargement méthodes de paiement:', error);
@@ -67,59 +71,108 @@ const PaymentMethodSelectionScreen = ({ route, navigation }) => {
     return `${amount.toLocaleString()} FCFA`;
   };
 
+  const getMethodIcon = (method) => {
+    if (method.id.includes('balance')) return 'wallet';
+    if (method.id.includes('orange')) return 'phone-portrait';
+    if (method.id.includes('mtn')) return 'phone-portrait';
+    if (method.id.includes('card')) return 'card';
+    return method.icon || 'card';
+  };
+
+  const getMethodIconColor = (method, isSelected) => {
+    if (isSelected) return COLORS.primary;
+    if (method.id.includes('balance')) return COLORS.success;
+    if (method.id.includes('orange')) return '#FF6B00';
+    if (method.id.includes('mtn')) return '#FFD700';
+    return COLORS.text.secondary;
+  };
+
   const PaymentMethodCard = ({ method, isSelected, onSelect }) => (
     <TouchableOpacity
       style={[
         styles.methodCard,
-        isSelected && styles.methodCardSelected
+        isSelected && styles.methodCardSelected,
+        method.primary && styles.methodCardPrimary,
+        method.disabled && styles.methodCardDisabled
       ]}
-      onPress={() => onSelect(method)}
+      onPress={() => method.disabled ? null : onSelect(method)}
+      disabled={method.disabled}
     >
       <View style={styles.methodHeader}>
-        <View style={styles.methodIcon}>
+        <View style={[
+          styles.methodIcon,
+          method.id.includes('balance') && styles.methodIconBalance,
+          method.id.includes('orange') && styles.methodIconOrange,
+          method.id.includes('mtn') && styles.methodIconMTN,
+          method.disabled && styles.methodIconDisabled
+        ]}>
           <Ionicons 
-            name={method.icon} 
+            name={getMethodIcon(method)} 
             size={24} 
-            color={isSelected ? COLORS.primary : COLORS.text.secondary} 
+            color={method.disabled ? COLORS.text.disabled : getMethodIconColor(method, isSelected)} 
           />
         </View>
         
         <View style={styles.methodContent}>
           <Text style={[
             styles.methodName,
-            isSelected && styles.methodNameSelected
+            isSelected && styles.methodNameSelected,
+            method.disabled && styles.methodNameDisabled
           ]}>
             {method.name}
           </Text>
-          <Text style={styles.methodDescription}>
+          <Text style={[
+            styles.methodDescription,
+            method.disabled && styles.methodDescriptionDisabled
+          ]}>
             {method.description}
           </Text>
         </View>
         
         <View style={[
           styles.radioButton,
-          isSelected && styles.radioButtonSelected
+          isSelected && styles.radioButtonSelected,
+          method.disabled && styles.radioButtonDisabled
         ]}>
-          {isSelected && (
+          {isSelected && !method.disabled && (
             <Ionicons name="checkmark" size={16} color={COLORS.surface} />
+          )}
+          {method.disabled && (
+            <Ionicons name="close" size={16} color={COLORS.text.disabled} />
           )}
         </View>
       </View>
       
       {/* Détails du paiement mixte */}
-      {method.amountFromBalance && method.amountExternal && (
+      {method.amountFromBalance > 0 && method.amountExternal > 0 && (
         <View style={styles.paymentBreakdown}>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Depuis votre solde</Text>
-            <Text style={styles.breakdownValue}>
+            <View style={styles.breakdownLabelContainer}>
+              <Ionicons name="wallet" size={16} color={COLORS.success} />
+              <Text style={styles.breakdownLabel}>Depuis votre solde</Text>
+            </View>
+            <Text style={[styles.breakdownValue, styles.balanceValue]}>
               -{formatAmount(method.amountFromBalance)}
             </Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Montant restant</Text>
+            <View style={styles.breakdownLabelContainer}>
+              <Ionicons name={getMethodIcon(method)} size={16} color={getMethodIconColor(method, false)} />
+              <Text style={styles.breakdownLabel}>Montant restant</Text>
+            </View>
             <Text style={styles.breakdownValue}>
               {formatAmount(method.amountExternal)}
             </Text>
+          </View>
+        </View>
+      )}
+      
+      {/* Affichage spécial pour paiement complet par solde */}
+      {method.amountFromBalance > 0 && method.amountExternal === 0 && (
+        <View style={styles.paymentBreakdown}>
+          <View style={styles.balanceOnlyIndicator}>
+            <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+            <Text style={styles.balanceOnlyText}>Paiement complet par votre solde</Text>
           </View>
         </View>
       )}
@@ -382,6 +435,73 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: COLORS.text.primary,
+  },
+  
+  breakdownLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  
+  balanceValue: {
+    color: COLORS.success,
+    fontWeight: '600',
+  },
+  
+  balanceOnlyIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.success + '10',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  
+  balanceOnlyText: {
+    fontSize: 14,
+    color: COLORS.success,
+    fontWeight: '500',
+  },
+  
+  methodCardPrimary: {
+    borderWidth: 2,
+    borderColor: COLORS.success + '30',
+    backgroundColor: COLORS.success + '05',
+  },
+  
+  methodIconBalance: {
+    backgroundColor: COLORS.success + '15',
+  },
+  
+  methodIconOrange: {
+    backgroundColor: '#FF6B00' + '15',
+  },
+  
+  methodIconMTN: {
+    backgroundColor: '#FFD700' + '15',
+  },
+  
+  methodCardDisabled: {
+    opacity: 0.6,
+    backgroundColor: COLORS.background,
+  },
+  
+  methodIconDisabled: {
+    backgroundColor: COLORS.text.disabled + '15',
+  },
+  
+  methodNameDisabled: {
+    color: COLORS.text.disabled,
+  },
+  
+  methodDescriptionDisabled: {
+    color: COLORS.text.disabled,
+  },
+  
+  radioButtonDisabled: {
+    borderColor: COLORS.text.disabled,
+    backgroundColor: 'transparent',
   },
   
   securityInfo: {

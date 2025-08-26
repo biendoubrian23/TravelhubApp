@@ -169,35 +169,127 @@ export const balanceService = {
   // Traiter un paiement en utilisant le solde si possible
   async processPaymentWithBalance(userId, tripId, seatNumbers, totalPrice, paymentMethod) {
     try {
-      // Utiliser la fonction PostgreSQL pour traiter le paiement
-      const { data, error } = await supabase.rpc('process_payment_with_balance', {
-        p_user_id: userId,
-        p_trip_id: tripId,
-        p_seat_numbers: seatNumbers,
-        p_total_price: totalPrice,
-        p_payment_method: paymentMethod
-      })
-
-      if (error) {
-        console.error('Erreur lors du traitement du paiement:', error)
-        return { success: false, error }
-      }
-
-      const result = data[0]
+      console.log('🔍 Traitement paiement avec solde:', { userId, tripId, seatNumbers, totalPrice, paymentMethod });
       
-      return {
-        success: true,
-        data: {
-          bookingId: result.booking_id,
-          amountFromBalance: result.amount_from_balance,
-          amountToPay: result.amount_to_pay,
-          balanceSufficient: result.balance_sufficient
-        },
-        error: null
+      // 🔥 CORRECTION TEMPORAIRE: Utiliser bookingService au lieu de la fonction PostgreSQL
+      // pour éviter les problèmes de références BK et d'accolades
+      
+      // Vérifier le solde de l'utilisateur d'abord
+      const { balance: userBalance } = await this.getUserBalance(userId);
+      console.log('💰 Solde utilisateur:', userBalance);
+      
+      if (userBalance < totalPrice) {
+        return { 
+          success: false, 
+          error: { message: 'Solde insuffisant' },
+          data: {
+            amountFromBalance: userBalance,
+            amountToPay: totalPrice - userBalance,
+            balanceSufficient: false
+          }
+        };
       }
+      
+      // Utiliser bookingService pour créer les réservations (génère des références TH)
+      const { bookingService } = await import('./bookingService');
+      
+      const bookingData = {
+        userId: userId,
+        tripId: tripId,
+        seatNumbers: Array.isArray(seatNumbers) ? seatNumbers : [seatNumbers],
+        totalPrice: totalPrice,
+        paymentMethod: paymentMethod || 'balance'
+      };
+      
+      console.log('🚀 Création réservations via bookingService:', bookingData);
+      
+      const result = await bookingService.createMultipleBookings(bookingData);
+      
+      if (result.success && result.bookings) {
+        // Débiter le solde après création réussie des réservations
+        const debitResult = await this.debitBalance(
+          userId, 
+          totalPrice, 
+          `Paiement réservation ${result.bookingReference}`,
+          result.bookings[0]?.id || result.bookings[0]?.supabaseId
+        );
+        
+        if (debitResult.success) {
+          return {
+            success: true,
+            data: {
+              bookingId: result.bookingReference,
+              amountFromBalance: totalPrice,
+              amountToPay: 0,
+              balanceSufficient: true,
+              bookings: result.bookings,
+              newBalance: debitResult.newBalance || 0
+            },
+            error: null
+          };
+        } else {
+          // Si le débit échoue, on pourrait annuler les réservations ici
+          console.error('❌ Échec du débit, mais réservations créées');
+          return { success: false, error: debitResult.error };
+        }
+      } else {
+        return { success: false, error: result.error || 'Échec création réservations' };
+      }
+      
     } catch (error) {
       console.error('Erreur service paiement avec solde:', error)
       return { success: false, error }
+    }
+  },
+
+  // Débiter le solde utilisateur
+  async debitBalance(userId, amount, description, bookingId = null) {
+    try {
+      console.log('💳 Débit solde:', { userId, amount, description, bookingId });
+      
+      // Vérifier le solde actuel
+      const { balance: currentBalance } = await this.getUserBalance(userId);
+      if (currentBalance < amount) {
+        return { success: false, error: 'Solde insuffisant' };
+      }
+      
+      // Débiter le solde
+      const { data, error } = await supabase
+        .from('users')
+        .update({ balance: currentBalance - amount })
+        .eq('id', userId)
+        .select('balance')
+        .single();
+        
+      if (error) {
+        console.error('❌ Erreur débit solde:', error);
+        return { success: false, error };
+      }
+      
+      // Enregistrer la transaction
+      const { data: transaction, error: transactionError } = await supabase
+        .from('balance_transactions')
+        .insert({
+          user_id: userId,
+          booking_id: bookingId,
+          transaction_type: 'payment',
+          amount: -amount,
+          description: description
+        })
+        .select()
+        .single();
+        
+      if (transactionError) {
+        console.error('❌ Erreur enregistrement transaction:', transactionError);
+        // Même si la transaction échoue, le débit a réussi
+      }
+      
+      console.log('✅ Solde débité avec succès, nouveau solde:', data.balance);
+      return { success: true, newBalance: data.balance, transaction };
+      
+    } catch (error) {
+      console.error('❌ Erreur débit solde:', error);
+      return { success: false, error };
     }
   },
 

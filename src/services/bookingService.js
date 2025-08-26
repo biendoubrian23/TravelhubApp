@@ -130,13 +130,39 @@ export const bookingService = {
       if (bookingData.selectedSeats && Array.isArray(bookingData.selectedSeats)) {
         console.log('📋 Traitement sièges VIP array...');
         finalSeatNumbers = bookingData.selectedSeats.map(seat => {
-          const seatNumber = typeof seat === 'object' ? seat.seat_number || seat.number : seat;
+          let seatNumber;
+          if (typeof seat === 'object') {
+            seatNumber = seat.seat_number || seat.number || seat.id;
+          } else if (typeof seat === 'string') {
+            seatNumber = seat;
+          } else if (typeof seat === 'number') {
+            seatNumber = seat.toString();
+          } else {
+            seatNumber = String(seat);
+          }
           console.log('- Siège mappé:', seat, '→', seatNumber);
+          return seatNumber;
+        });
+      } else if (bookingData.seatNumbers && Array.isArray(bookingData.seatNumbers)) {
+        console.log('📋 Traitement sièges via seatNumbers array...');
+        finalSeatNumbers = bookingData.seatNumbers.map(seat => {
+          let seatNumber;
+          if (typeof seat === 'object') {
+            seatNumber = seat.seat_number || seat.number || seat.id;
+          } else if (typeof seat === 'string') {
+            seatNumber = seat;
+          } else if (typeof seat === 'number') {
+            seatNumber = seat.toString();
+          } else {
+            seatNumber = String(seat);
+          }
+          console.log('- Siège mappé via seatNumbers:', seat, '→', seatNumber);
           return seatNumber;
         });
       } else if (bookingData.seatNumber) {
         console.log('📋 Traitement siège unique...');
-        finalSeatNumbers = [bookingData.seatNumber];
+        // S'assurer que seatNumber est une chaîne
+        finalSeatNumbers = [String(bookingData.seatNumber)];
       } else {
         console.log('📋 Attribution automatique pour trajets non-VIP...');
         // Attribution automatique pour trajets non-VIP
@@ -149,13 +175,29 @@ export const bookingService = {
       console.log('Sièges à réserver:', finalSeatNumbers);
 
       // Vérifier que les sièges existent et sont disponibles
+      console.log('🔍 Vérification des sièges avant réservation...');
+      console.log('- Trip ID:', bookingData.tripId, 'Type:', typeof bookingData.tripId);
+      console.log('- Sièges à vérifier:', finalSeatNumbers, 'Types:', finalSeatNumbers.map(s => typeof s));
+      
+      // DEBUG: Construire manuellement la requête pour voir ce qui se passe
+      console.log('🔎 Requête SQL équivalente:');
+      console.log(`SELECT seat_number, is_available FROM seat_maps WHERE trip_id = '${bookingData.tripId}' AND seat_number IN (${finalSeatNumbers.map(s => `'${s}'`).join(', ')})`);
+      
       const { data: existingSeats, error: seatCheckError } = await supabase
         .from('seat_maps')
         .select('seat_number, is_available')
         .eq('trip_id', bookingData.tripId)
         .in('seat_number', finalSeatNumbers);
 
+      console.log('📋 Résultat requête seat_maps:', existingSeats);
+      console.log('- Nombre de sièges trouvés:', existingSeats?.length || 0);
+      console.log('- Détails par siège:');
+      existingSeats?.forEach(seat => {
+        console.log(`  • Siège ${seat.seat_number}: ${seat.is_available ? 'DISPONIBLE' : 'OCCUPÉ'}`);
+      });
+
       if (seatCheckError) {
+        console.error('❌ Erreur requête seat_maps:', seatCheckError);
         throw new Error('Impossible de vérifier la disponibilité des sièges');
       }
 
@@ -165,6 +207,11 @@ export const bookingService = {
       }
 
       // Marquer tous les sièges comme occupés d'abord
+      console.log('🔄 Marquage des sièges comme occupés...');
+      console.log('- Trip ID:', bookingData.tripId);
+      console.log('- Sièges à marquer:', finalSeatNumbers);
+      console.log('- Types des sièges:', finalSeatNumbers.map(s => `${s} (${typeof s})`));
+      
       const { error: seatError } = await supabase
         .from('seat_maps')
         .update({ is_available: false })
@@ -172,10 +219,27 @@ export const bookingService = {
         .in('seat_number', finalSeatNumbers);
 
       if (seatError) {
+        console.error('❌ Erreur lors du marquage des sièges:', seatError);
         throw new Error('Impossible de réserver les sièges sélectionnés');
       }
 
       console.log(`✅ Sièges ${finalSeatNumbers.join(', ')} marqués comme occupés`);
+      
+      // Vérification que les sièges sont bien marqués comme occupés
+      const { data: verificationSeats, error: verificationError } = await supabase
+        .from('seat_maps')
+        .select('seat_number, is_available')
+        .eq('trip_id', bookingData.tripId)
+        .in('seat_number', finalSeatNumbers);
+        
+      console.log('🔍 Vérification post-marquage:', verificationSeats);
+      
+      if (verificationSeats) {
+        const stillAvailable = verificationSeats.filter(s => s.is_available);
+        if (stillAvailable.length > 0) {
+          console.warn('⚠️ Certains sièges sont encore disponibles:', stillAvailable);
+        }
+      }
 
       // Vérifier le parrainage AVANT de créer les réservations pour savoir si c'est la première
       const referralInfo = await this.checkReferralForFirstBooking(bookingData.userId);
@@ -186,12 +250,19 @@ export const bookingService = {
       const basePrice = bookingData.totalPrice ? Math.floor(bookingData.totalPrice / finalSeatNumbers.length) : 0;
       
       for (let i = 0; i < finalSeatNumbers.length; i++) {
-        const seatNumber = finalSeatNumbers[i];
+        const seatNumber = String(finalSeatNumbers[i]).trim(); // S'assurer que c'est une chaîne propre
+        
+        console.log(`🪑 Préparation siège ${i + 1}:`, {
+          original: finalSeatNumbers[i],
+          type: typeof finalSeatNumbers[i],
+          cleaned: seatNumber,
+          cleanedType: typeof seatNumber
+        });
         
         const reservationData = {
           trip_id: bookingData.tripId,
           user_id: bookingData.userId,
-          seat_number: seatNumber, // UN SEUL siège par réservation
+          seat_number: seatNumber, // UN SEUL siège par réservation (chaîne propre)
           passenger_name: userData.full_name || 'Client TravelHub',
           passenger_phone: userData.phone || '+237600000000',
           total_price_fcfa: basePrice, // Pas de réduction pour le filleul
@@ -236,7 +307,14 @@ export const bookingService = {
 
       console.log('=== FIN CRÉATION RÉSERVATIONS MULTIPLES ===');
       console.log(`✅ ${createdBookings.length} réservations créées avec succès`);
-      return createdBookings;
+      
+      // Retourner un format standardisé comme les autres services de paiement
+      return {
+        success: true,
+        bookingReference: createdBookings[0]?.booking_reference || `TH${Date.now()}`,
+        bookings: createdBookings,
+        count: createdBookings.length
+      };
       
     } catch (error) {
       console.error('❌ ERREUR GÉNÉRALE createMultipleBookings:', error);

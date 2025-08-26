@@ -180,45 +180,117 @@ export const paymentService = {
   // Obtenir les méthodes de paiement disponibles selon le solde
   async getAvailablePaymentMethods(userId, amount) {
     try {
+      console.log('🔄 getAvailablePaymentMethods appelé pour user:', userId, 'montant:', amount);
       const breakdown = await this.calculatePaymentBreakdown(userId, amount);
+      console.log('📊 Breakdown calculé:', breakdown);
       
       const methods = [];
       
-      // Paiement par solde uniquement (si suffisant)
-      if (breakdown.canUseBalance && breakdown.amountToPay === 0) {
+      // Toujours afficher l'option solde, même si elle est à 0
+      if (breakdown.userBalance >= amount) {
+        // Paiement par solde uniquement (si suffisant)
         methods.push({
           id: 'balance_only',
-          name: 'Solde utilisateur',
-          description: 'Paiement complet par votre solde',
+          name: 'Mon solde',
+          description: `Solde suffisant: ${breakdown.userBalance.toLocaleString()} FCFA`,
           icon: 'wallet',
           amount: breakdown.amountFromBalance,
-          available: true
+          amountFromBalance: breakdown.amountFromBalance,
+          amountExternal: 0,
+          available: true,
+          primary: true
         });
-      }
-      
-      // Paiement mixte (solde + externe)
-      if (breakdown.canUseBalance && breakdown.amountToPay > 0) {
+      } else if (breakdown.userBalance > 0) {
+        // Paiement mixte solde + autres méthodes (si solde partiel)
         methods.push({
-          id: 'balance_plus_external',
-          name: 'Solde + Mobile Money',
-          description: `${breakdown.amountFromBalance.toLocaleString()} FCFA du solde + ${breakdown.amountToPay.toLocaleString()} FCFA par Mobile Money`,
-          icon: 'card',
+          id: 'balance_plus_orange',
+          name: 'Mon solde + Orange Money',
+          description: `Solde: ${breakdown.amountFromBalance.toLocaleString()} FCFA + Reste: ${breakdown.amountToPay.toLocaleString()} FCFA`,
+          icon: 'wallet',
           amount: amount,
           amountFromBalance: breakdown.amountFromBalance,
           amountExternal: breakdown.amountToPay,
-          available: true
+          available: true,
+          primary: true,
+          externalProvider: 'orange'
+        });
+        
+        methods.push({
+          id: 'balance_plus_mtn',
+          name: 'Mon solde + MTN Mobile Money',
+          description: `Solde: ${breakdown.amountFromBalance.toLocaleString()} FCFA + Reste: ${breakdown.amountToPay.toLocaleString()} FCFA`,
+          icon: 'wallet',
+          amount: amount,
+          amountFromBalance: breakdown.amountFromBalance,
+          amountExternal: breakdown.amountToPay,
+          available: true,
+          externalProvider: 'mtn'
+        });
+        
+        methods.push({
+          id: 'balance_plus_card',
+          name: 'Mon solde + Carte bancaire',
+          description: `Solde: ${breakdown.amountFromBalance.toLocaleString()} FCFA + Reste: ${breakdown.amountToPay.toLocaleString()} FCFA`,
+          icon: 'wallet',
+          amount: amount,
+          amountFromBalance: breakdown.amountFromBalance,
+          amountExternal: breakdown.amountToPay,
+          available: true,
+          externalProvider: 'card'
+        });
+      } else {
+        // Pas de solde, mais afficher quand même l'option pour informer
+        methods.push({
+          id: 'balance_info',
+          name: 'Mon solde',
+          description: 'Solde insuffisant: 0 FCFA disponible',
+          icon: 'wallet',
+          amount: 0,
+          amountFromBalance: 0,
+          amountExternal: amount,
+          available: false,
+          disabled: true
         });
       }
       
-      // Paiement externe uniquement
+      // Toujours ajouter les options de paiement traditionnelles
       methods.push({
-        id: 'external_only',
-        name: 'Mobile Money / Carte',
-        description: 'Paiement complet par Mobile Money ou carte bancaire',
+        id: 'orange_only',
+        name: 'Orange Money',
+        description: 'Paiement mobile Orange',
+        icon: 'phone-portrait',
+        amount: amount,
+        amountFromBalance: 0,
+        amountExternal: amount,
+        available: true,
+        externalProvider: 'orange'
+      });
+      
+      methods.push({
+        id: 'mtn_only',
+        name: 'MTN Mobile Money',
+        description: 'Paiement mobile MTN',
+        icon: 'phone-portrait',
+        amount: amount,
+        amountFromBalance: 0,
+        amountExternal: amount,
+        available: true,
+        externalProvider: 'mtn'
+      });
+      
+      methods.push({
+        id: 'card_only',
+        name: 'Carte bancaire',
+        description: 'Visa, Mastercard',
         icon: 'card',
         amount: amount,
-        available: true
+        amountFromBalance: 0,
+        amountExternal: amount,
+        available: true,
+        externalProvider: 'card'
       });
+      
+      console.log('📋 Méthodes générées:', methods);
       
       return {
         methods,
@@ -226,13 +298,13 @@ export const paymentService = {
         error: null
       };
     } catch (error) {
-      console.error('Erreur lors de la récupération des méthodes de paiement:', error);
+      console.error('❌ Erreur lors de la récupération des méthodes de paiement:', error);
       return {
         methods: [{
-          id: 'external_only',
-          name: 'Mobile Money / Carte',
-          description: 'Paiement par Mobile Money ou carte bancaire',
-          icon: 'card',
+          id: 'orange_only',
+          name: 'Orange Money',
+          description: 'Paiement mobile Orange',
+          icon: 'phone-portrait',
           amount: amount,
           available: true
         }],
