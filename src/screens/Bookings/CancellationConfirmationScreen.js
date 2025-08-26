@@ -60,11 +60,13 @@ const CancellationConfirmationScreen = ({ route, navigation }) => {
 
     Alert.alert(
       'Confirmer l\'annulation',
-      `Êtes-vous absolument sûr de vouloir annuler cette réservation ? ${cancellationInfo.refund.toLocaleString()} FCFA seront ajoutés à votre solde.`,
+      `Vous recevrez ${cancellationInfo.refund.toLocaleString()} FCFA sur votre solde (frais d'annulation : ${cancellationInfo.feePercent}%).
+
+Cette action est irréversible.`,
       [
-        { text: 'Non', style: 'cancel' },
+        { text: 'Annuler', style: 'cancel' },
         {
-          text: 'Oui, annuler',
+          text: 'Confirmer l\'annulation',
           style: 'destructive',
           onPress: processCancellation
         }
@@ -103,16 +105,35 @@ const CancellationConfirmationScreen = ({ route, navigation }) => {
 
       if (result.success) {
         console.log('✅ Annulation réussie');
+        
+        // ✅ Message de succès professionnel et dynamique
+        const successMessage = `${result.data.refundAmount.toLocaleString()} FCFA ajoutés à votre solde.`;
+
         Alert.alert(
-          'Annulation réussie',
-          `Votre réservation a été annulée. ${result.data.refundAmount.toLocaleString()} FCFA ont été ajoutés à votre solde.`,
+          '✅ Annulation confirmée',
+          successMessage,
           [
             {
-              text: 'OK',
+              text: 'Voir mon solde',
               onPress: () => {
-                // Revenir à l'onglet Home tout en conservant la barre d'onglets
+                // Aller directement vers l'historique du solde pour voir la transaction
                 navigation.navigate('ClientMain', {
-                  screen: 'Home'
+                  screen: 'Profile',
+                  params: {
+                    screen: 'BalanceHistory',
+                    params: { refreshOnLoad: true }
+                  }
+                });
+              }
+            },
+            {
+              text: 'Retour à l\'accueil',
+              style: 'cancel',
+              onPress: () => {
+                // Revenir à l'onglet Home avec paramètre de rafraîchissement
+                navigation.navigate('ClientMain', {
+                  screen: 'Home',
+                  params: { shouldRefresh: true }
                 });
               }
             }

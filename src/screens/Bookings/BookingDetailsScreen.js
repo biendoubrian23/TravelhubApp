@@ -12,12 +12,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../../components';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
-import { useBookingsStore } from '../../store';
+import { useBookingsStore, useAuthStore } from '../../store';
 import { getResponsiveFontSize, scaleFont } from '../../utils/responsive';
 
 const BookingDetailsScreen = ({ route, navigation }) => {
   const { bookingId } = route.params;
   const { bookings, cancelBooking } = useBookingsStore();
+  const { user } = useAuthStore();
   
   // Trouver la réservation avec protection
   const booking = bookings.find(b => b.id === bookingId);
@@ -120,7 +121,9 @@ const BookingDetailsScreen = ({ route, navigation }) => {
       booking: {
         ...safeBooking,
         supabaseId: booking.supabaseId || booking.id,
-        user_id: booking.user_id // S'assurer que l'ID utilisateur est présent
+        user_id: booking.user_id || user?.id, // S'assurer que l'ID utilisateur est présent
+        total_price_fcfa: safeBooking.price || booking.total_price_fcfa,
+        booking_reference: safeBooking.id
       }
     });
   };

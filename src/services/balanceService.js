@@ -85,12 +85,12 @@ export const balanceService = {
 
       const feePercent = parseFloat(setting?.setting_value || '30')
       const fee = Math.round((price * feePercent) / 100)
-      const refund = (price - fee) / 2  // SOLUTION RADICALE: Division par 2 pour compenser le doublon
+      const refund = price - fee  // ✅ CORRECTION: Calcul normal sans division artificielle
 
       return {
         feePercent,
         fee,
-        refund, // Division par 2 pour compenser le doublon qui se produit
+        refund, // ✅ Montant correct sans division par 2
         error: null
       }
     } catch (error) {
@@ -98,7 +98,7 @@ export const balanceService = {
       return {
         feePercent: 30,
         fee: Math.round((Number(bookingPrice) * 30) / 100),
-        refund: (Number(bookingPrice) - Math.round((Number(bookingPrice) * 30) / 100)) / 2, // Division par 2 pour compenser le doublon
+        refund: Number(bookingPrice) - Math.round((Number(bookingPrice) * 30) / 100), // ✅ CORRECTION: Calcul normal sans division
         error
       }
     }
@@ -232,7 +232,12 @@ export const balanceService = {
         totalBookingsCount: totalBookings.length
       });
       
-      // Mettre à jour le solde UNE SEULE FOIS avec le remboursement total
+      // ✅ RÉACTIVATION - Mise à jour du solde (le trigger ne s'en occupe plus)
+      console.log('✅ Mise à jour du solde RÉACTIVÉE côté JavaScript');
+      console.log('💰 Solde actuel:', currentBalance);
+      console.log('💸 Remboursement à appliquer:', refundAmount);
+      
+      // Calcul et application du nouveau solde
       const newBalance = currentBalance + refundAmount;
       
       const { data: updatedUser, error: balanceError } = await supabase
@@ -241,6 +246,13 @@ export const balanceService = {
         .eq('id', userId)
         .select()
         .single();
+      
+      console.log('✅ Mise à jour terminée:', {
+        ancienSolde: currentBalance,
+        remboursement: refundAmount,
+        nouveauSolde: newBalance,
+        soldeConfirme: updatedUser?.balance
+      });
         
       console.log('💰 Mise à jour solde - Résultat:', { 
         currentBalance, 
@@ -352,7 +364,13 @@ export const balanceService = {
       // 🔒 VERROU DE BASE DE DONNÉES: Utiliser une transaction unique pour l'atomicité
       // Créer une ID de transaction unique garantissant qu'une seule transaction sera créée
       const uniqueTransactionId = `${userId}-${bookingId}-${Math.floor(Date.now() / 1000)}`;
-      const uniqueDescription = `Remboursement ${booking.booking_reference} - ${totalBookings.length} siège${totalBookings.length > 1 ? 's' : ''} - ${feePercent}% frais`;
+      
+      // ✅ Description améliorée et plus claire
+      const tripInfo = booking.trips ? 
+        `${booking.trips.departure_city} → ${booking.trips.arrival_city}` : 
+        `Trajet ${booking.booking_reference}`;
+      
+      const uniqueDescription = `Remboursement après annulation - ${tripInfo} - Frais: ${fee.toLocaleString()} FCFA`;
       
       console.log('💰 Création de la transaction unique:', {
         userId,
@@ -375,18 +393,15 @@ export const balanceService = {
           expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() // 5 minutes
         })
         .select()
-        .single()
-        .catch(err => {
-          // Si erreur de contrainte unique, c'est qu'une transaction identique existe déjà
-          if (err.code === '23505') { // Code PostgreSQL pour violation de contrainte unique
-            console.log('⚠️ Verrou de transaction déjà présent:', uniqueTransactionId);
-            return { error: { message: 'Transaction déjà en cours' } };
-          }
-          return { error: err };
-        });
-      
+        .single();
+        
+      // Vérifier l'erreur après la requête
       if (lockError) {
         console.log('⚠️ Erreur verrou de transaction:', lockError);
+        // Si erreur de contrainte unique, c'est qu'une transaction identique existe déjà
+        if (lockError.code === '23505') {
+          console.log('⚠️ Verrou de transaction déjà présent:', uniqueTransactionId);
+        }
         // Si verrou déjà présent, on considère que c'est un succès pour éviter le double remboursement
         return {
           success: true,
@@ -402,33 +417,16 @@ export const balanceService = {
         };
       }
       
-      // ÉTAPE 2: Créer la transaction de remboursement
-      const { data: transaction, error: transactionError } = await supabase
-        .from('balance_transactions')
-        .insert({
-          user_id: userId,
-          booking_id: bookingId, // ID de la réservation principale
-          transaction_type: 'refund',
-          amount: refundAmount, // ⚠️ IMPORTANT: montant positif pour un crédit
-          description: uniqueDescription,
-          transaction_lock_id: uniqueTransactionId // Référencer le verrou pour traçabilité
-        })
-        .select()
-        .single();
-        
-      console.log('💼 Transaction remboursement créée:', { 
-        transaction, 
-        transactionError,
-        refundAmount,
-        refundType: typeof refundAmount,
-        bookingsCount: totalBookings.length,
-        uniqueDescription
-      });
+      // ÉTAPE 2: DÉSACTIVÉ - Le trigger PostgreSQL gère maintenant les transactions
+      console.log('ℹ️ Création de transaction désactivée - Le trigger PostgreSQL s\'en charge');
       
-      if (transactionError) {
-        console.error('❌ Erreur création transaction:', transactionError);
-        // Même si la transaction échoue, le solde a été mis à jour
-      }
+      // Le trigger PostgreSQL va automatiquement :
+      // 1. Créer la transaction dans balance_transactions
+      // 2. Mettre à jour le solde utilisateur
+      // 3. Calculer les frais d'annulation
+      
+      const transaction = null; // Pas de transaction créée côté JS
+      const transactionError = null;
 
       console.log('✅ Annulation réussie - Transaction unique créée');
       return {
@@ -589,17 +587,16 @@ export const balanceService = {
   // Récupérer l'historique des transactions de solde
   async getBalanceTransactions(userId, limit = 20) {
     try {
-      // CORRECTION: Utiliser la vue clean_balance_transactions pour filtrer les doublons
-      // Si la vue n'existe pas, on fait une vérification côté client
-      const { data: checkView } = await supabase
-        .from('pg_views')
-        .select('viewname')
-        .eq('viewname', 'clean_balance_transactions')
-        .maybeSingle();
-        
-      // Récupérer les transactions
+      // 🚨 CORRECTION TEMPORAIRE: Utiliser directement la table balance_transactions
+      // pour s'assurer que les nouvelles transactions apparaissent immédiatement
+      console.log('🔍 Récupération des transactions directement depuis la table (pas de vue)');
+      
+      // Désactiver temporairement la vue pour éviter les filtres qui cachent les nouvelles transactions
+      const useCleanView = false; // Forcer l'utilisation de la table directe
+      
+      // Récupérer les transactions directement
       const { data, error } = await supabase
-        .from(checkView ? 'clean_balance_transactions' : 'balance_transactions')
+        .from('balance_transactions') // Toujours utiliser la table directe
         .select(`
           *,
           booking_id,
@@ -614,10 +611,14 @@ export const balanceService = {
         return { data: [], error }
       }
       
-      // Si on n'utilise pas la vue, filtrer les doublons côté client
-      let filteredData = data || [];
+      // ✅ CORRECTION TEMPORAIRE: Pas de filtrage pour s'assurer que toutes les transactions apparaissent
+      console.log(`� ${data?.length || 0} transactions récupérées directement depuis la table`);
       
-      if (!checkView && filteredData.length > 0) {
+      // Retourner toutes les transactions sans filtrage
+      const filteredData = data || [];
+      
+      /* FILTRAGE DÉSACTIVÉ TEMPORAIREMENT POUR DIAGNOSTIC
+      if (!useCleanView && filteredData.length > 0) {
         console.log('🔍 Filtrage des transactions en double côté client...');
         // Récupérer les ID des transactions en double (même booking_id, type et montant dans les 30 minutes)
         const seenBookings = new Map(); // Map de booking_id -> {firstId, timestamp}
@@ -647,6 +648,9 @@ export const balanceService = {
           filteredData = filteredData.filter(t => !duplicateIds.has(t.id));
         }
       }
+      */
+      
+      console.log(`✅ Retour de ${filteredData.length} transactions à l'interface`);
 
       return { data: filteredData, error: null }
     } catch (error) {

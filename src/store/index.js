@@ -558,23 +558,51 @@ export const useBookingsStore = create(devtools((set, get) => ({
     try {
       console.log('🗑️ Annulation de la réservation:', bookingId);
       
-      // Importer le service
-      const { bookingService } = await import('../services/bookingService');
+      // 🔥 NOUVELLE LOGIQUE: Utiliser le service de balance pour l'annulation avec remboursement
+      const { user } = useAuthStore.getState();
       
-      // Annuler dans la base de données
-      await bookingService.cancelBooking(bookingId);
-      console.log('✅ Réservation annulée en BD');
-      
-      // Mettre à jour le store local
-      set(state => ({
-        bookings: state.bookings.map(booking =>
-          booking.id === bookingId || booking.supabaseId === bookingId
-            ? { ...booking, status: 'cancelled', booking_status: 'cancelled' }
-            : booking
-        )
-      }));
-      
-      console.log('✅ Store local mis à jour');
+      if (user?.id) {
+        // Pour les utilisateurs connectés, utiliser le service de balance pour remboursement
+        const { balanceService } = await import('../services/balanceService');
+        
+        console.log('🔄 Annulation avec remboursement pour:', { bookingId, userId: user.id });
+        const result = await balanceService.cancelBookingWithRefund(bookingId, user.id);
+        
+        if (result.success) {
+          // Mettre à jour l'état local seulement si le remboursement a réussi
+          set(state => ({
+            bookings: state.bookings.map(booking =>
+              booking.id === bookingId || booking.supabaseId === bookingId
+                ? { ...booking, status: 'cancelled', booking_status: 'cancelled' }
+                : booking
+            )
+          }));
+          
+          console.log('✅ Annulation et remboursement réussis:', result.data);
+          return { success: true, data: result.data };
+        } else {
+          console.error('❌ Échec annulation avec remboursement:', result.error);
+          throw new Error(result.error?.message || 'Échec du remboursement');
+        }
+      } else {
+        // Pour les utilisateurs non connectés, annulation locale seulement
+        console.log('🔄 Annulation locale (utilisateur non connecté)');
+        
+        // Importer le service pour annulation en BD seulement
+        const { bookingService } = await import('../services/bookingService');
+        await bookingService.cancelBooking(bookingId);
+        
+        set(state => ({
+          bookings: state.bookings.map(booking =>
+            booking.id === bookingId || booking.supabaseId === bookingId
+              ? { ...booking, status: 'cancelled', booking_status: 'cancelled' }
+              : booking
+          )
+        }));
+        
+        console.log('✅ Annulation locale réussie');
+        return { success: true, data: { note: 'Annulation locale sans remboursement' } };
+      }
     } catch (error) {
       console.error('❌ Erreur lors de l\'annulation:', error);
       throw error;

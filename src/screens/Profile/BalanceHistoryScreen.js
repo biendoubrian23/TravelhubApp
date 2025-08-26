@@ -14,7 +14,7 @@ import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
 import { balanceService } from '../../services/balanceService';
 import { useAuthStore } from '../../store';
 
-const BalanceHistoryScreen = ({ navigation }) => {
+const BalanceHistoryScreen = ({ navigation, route }) => {
   const { user } = useAuthStore();
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState([]);
@@ -25,6 +25,16 @@ const BalanceHistoryScreen = ({ navigation }) => {
   useEffect(() => {
     loadBalanceData();
   }, []);
+
+  // ✅ Rafraîchissement automatique si demandé
+  useEffect(() => {
+    if (route?.params?.refreshOnLoad) {
+      console.log('🔄 Rafraîchissement automatique demandé');
+      setTimeout(() => {
+        loadBalanceData();
+      }, 500); // Petit délai pour laisser le temps à la transaction d'être enregistrée
+    }
+  }, [route?.params?.refreshOnLoad]);
 
   const loadBalanceData = async () => {
     if (!user?.id) return;
@@ -196,16 +206,34 @@ const BalanceHistoryScreen = ({ navigation }) => {
               const icon = getTransactionIcon(transaction.transaction_type);
               const isPositive = transaction.amount > 0;
               
+              // ✅ Détection des nouvelles transactions (dernières 24h)
+              const transactionDate = new Date(transaction.created_at);
+              const now = new Date();
+              const isNew = (now - transactionDate) < 24 * 60 * 60 * 1000; // 24 heures
+              
               return (
-                <View key={transaction.id || index} style={styles.transactionItem}>
+                <View key={transaction.id || index} style={[
+                  styles.transactionItem,
+                  isNew && styles.newTransactionItem
+                ]}>
                   <View style={styles.transactionIcon}>
                     <Ionicons name={icon.name} size={20} color={icon.color} />
+                    {isNew && (
+                      <View style={styles.newIndicator}>
+                        <Text style={styles.newIndicatorText}>•</Text>
+                      </View>
+                    )}
                   </View>
                   
                   <View style={styles.transactionContent}>
-                    <Text style={styles.transactionDescription}>
-                      {getTransactionDescription(transaction)}
-                    </Text>
+                    <View style={styles.transactionHeader}>
+                      <Text style={styles.transactionDescription}>
+                        {getTransactionDescription(transaction)}
+                      </Text>
+                      {isNew && (
+                        <Text style={styles.newLabel}>NOUVEAU</Text>
+                      )}
+                    </View>
                     <Text style={styles.transactionDate}>
                       {formatDate(transaction.created_at)}
                     </Text>
@@ -388,6 +416,13 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   
+  // ✅ Style pour les nouvelles transactions
+  newTransactionItem: {
+    borderWidth: 1,
+    borderColor: COLORS.success + '30',
+    backgroundColor: COLORS.success + '05',
+  },
+  
   transactionIcon: {
     width: 40,
     height: 40,
@@ -396,17 +431,55 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING.md,
+    position: 'relative',
+  },
+  
+  // ✅ Indicateur de nouvelle transaction
+  newIndicator: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.success,
+  },
+  
+  newIndicatorText: {
+    fontSize: 8,
+    color: COLORS.success,
+    fontWeight: 'bold',
   },
   
   transactionContent: {
     flex: 1,
   },
   
+  // ✅ Header pour inclure le label "NOUVEAU"
+  transactionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
+  },
+  
   transactionDescription: {
     fontSize: 16,
     fontWeight: '500',
     color: COLORS.text.primary,
-    marginBottom: SPACING.xs,
+    flex: 1,
+  },
+  
+  // ✅ Label "NOUVEAU"
+  newLabel: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: COLORS.success,
+    backgroundColor: COLORS.success + '20',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   
   transactionDate: {
