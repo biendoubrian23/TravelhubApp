@@ -115,24 +115,14 @@ const BookingDetailsScreen = ({ route, navigation }) => {
   const statusInfo = getStatusInfo(safeBooking.status);
 
   const handleCancelBooking = () => {
-    Alert.alert(
-      'Annuler la réservation',
-      'Êtes-vous sûr de vouloir annuler cette réservation ? Cette action est irréversible.',
-      [
-        { text: 'Non', style: 'cancel' },
-        {
-          text: 'Oui, annuler',
-          style: 'destructive',
-          onPress: () => {
-            // Utiliser supabaseId en priorité (UUID de la BD), sinon id local
-            const bookingIdToCancel = booking.supabaseId || booking.id;
-            console.log('🗑️ Annulation avec ID:', bookingIdToCancel, 'Type:', typeof bookingIdToCancel);
-            cancelBooking(bookingIdToCancel);
-            navigation.goBack();
-          }
-        }
-      ]
-    );
+    // Naviguer vers l'écran de confirmation d'annulation
+    navigation.navigate('CancellationConfirmation', {
+      booking: {
+        ...safeBooking,
+        supabaseId: booking.supabaseId || booking.id,
+        user_id: booking.user_id // S'assurer que l'ID utilisateur est présent
+      }
+    });
   };
 
   const handleShareBooking = async () => {

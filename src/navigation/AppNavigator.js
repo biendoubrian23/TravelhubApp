@@ -16,6 +16,7 @@ import SignupScreen from '../screens/Auth/SignupScreen';
 import ProfileScreen from '../screens/Profile/ProfileScreen';
 import BookingsScreen from '../screens/Bookings/BookingsScreen';
 import BookingDetailsScreen from '../screens/Bookings/BookingDetailsScreen';
+import CancellationConfirmationScreen from '../screens/Bookings/CancellationConfirmationScreen';
 import FavoritesScreen from '../screens/Favorites/FavoritesScreen';
 import SupabaseTestScreen from '../screens/SupabaseTestScreen';
 import RealtimeTestScreen from '../screens/RealtimeTestScreenDiagnostic';
@@ -25,6 +26,7 @@ import SeatSelectionScreen from '../screens/SeatSelection/SeatSelectionScreen';
 import RecapScreen from '../screens/Recap/RecapScreen';
 import PaymentScreen from '../screens/Payment/PaymentScreen';
 import PaymentSuccessScreen from '../screens/Payment/PaymentSuccessScreen';
+import PaymentMethodSelectionScreen from '../screens/Payment/PaymentMethodSelectionScreen';
 import ReservationTestScreen from '../screens/ReservationTestScreen';
 import DatabaseTestScreen from '../screens/DatabaseTestScreen';
 import UserDataTestScreen from '../screens/UserDataTestScreen';
@@ -38,6 +40,7 @@ import NotificationSettingsScreen from '../screens/Profile/NotificationSettingsS
 import HelpSupportScreen from '../screens/Profile/HelpSupportScreen';
 import TermsConditionsScreen from '../screens/Profile/TermsConditionsScreen';
 import PrivacyPolicyScreen from '../screens/Profile/PrivacyPolicyScreen';
+import BalanceHistoryScreen from '../screens/Profile/BalanceHistoryScreen';
 // Temporairement désactivés
 // import AboutScreen from '../screens/Profile/AboutScreen';
 import SecuritySettingsScreen from '../screens/Profile/SecuritySettingsScreen';
@@ -220,6 +223,15 @@ const AppNavigator = () => {
                 animationTypeForReplace: 'push',
               }}
             />
+            <Stack.Screen 
+              name="CancellationConfirmation" 
+              component={CancellationConfirmationScreen}
+              options={{
+                title: 'Annulation',
+                presentation: 'card',
+                animationTypeForReplace: 'push',
+              }}
+            />
 
             {/* Profile Screens */}
             <Stack.Screen 
@@ -263,6 +275,15 @@ const AppNavigator = () => {
               component={TripHistoryScreen}
               options={{
                 title: 'Historique des voyages',
+                presentation: 'card',
+                animationTypeForReplace: 'push',
+              }}
+            />
+            <Stack.Screen 
+              name="BalanceHistory" 
+              component={BalanceHistoryScreen}
+              options={{
+                title: 'Mon solde',
                 presentation: 'card',
                 animationTypeForReplace: 'push',
               }}
@@ -367,6 +388,15 @@ const AppNavigator = () => {
           name="Recap" 
           component={RecapScreen}
           options={{
+            presentation: 'card',
+            animationTypeForReplace: 'push',
+          }}
+        />
+        <Stack.Screen 
+          name="PaymentMethodSelection" 
+          component={PaymentMethodSelectionScreen}
+          options={{
+            title: 'Mode de paiement',
             presentation: 'card',
             animationTypeForReplace: 'push',
           }}

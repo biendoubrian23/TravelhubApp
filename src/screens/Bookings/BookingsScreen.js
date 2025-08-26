@@ -73,7 +73,7 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
   const { user } = useAuthStore();
   const navigation = useNavigation(); // Hook pour la navigation
   const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('confirmed');
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   
@@ -560,8 +560,8 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
           value={filter}
           onValueChange={setFilter}
           buttons={[
-            { value: 'all', label: 'Tous' },
             { value: 'confirmed', label: 'Confirmés' },
+            { value: 'all', label: 'Tous' },
             { value: 'pending', label: 'En attente' },
             { value: 'completed', label: 'Terminés' },
           ]}

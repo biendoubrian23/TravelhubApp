@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,11 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../constants';
+import BalanceCard, { BalanceDisplay } from '../../components/BalanceCard';
 // import avatarService from '../../services/avatarService';
 // import avatarService from '../../services/avatarServiceClean';
 import avatarService from '../../services/avatarServiceDisabled';
@@ -22,6 +24,7 @@ import avatarService from '../../services/avatarServiceDisabled';
 const ProfileScreen = ({ navigation }) => {
   const { user, signOut, updateProfile } = useAuthStore();
   const [loading, setLoading] = useState(false);
+  const balanceCardRef = useRef(null);
   const [userStats, setUserStats] = useState({
     totalBookings: 0,        // Nombre de réservations
     referralsCount: 0,       // Nombre de parrainés (dynamique)
@@ -36,6 +39,15 @@ const ProfileScreen = ({ navigation }) => {
   useEffect(() => {
     loadUserStats();
   }, [user]); // Recharger quand l'utilisateur change
+
+  // Rafraîchir le solde quand l'écran devient actif
+  useFocusEffect(
+    React.useCallback(() => {
+      if (balanceCardRef.current) {
+        balanceCardRef.current.refresh();
+      }
+    }, [])
+  );
 
   const loadUserStats = async () => {
     try {
@@ -281,6 +293,12 @@ const ProfileScreen = ({ navigation }) => {
       </View>
 
       <ScrollView style={styles.content}>
+        {/* Solde utilisateur */}
+        <BalanceCard 
+          ref={balanceCardRef}
+          style={{ marginHorizontal: SPACING.md, marginVertical: SPACING.sm }}
+        />
+
         {/* Compte */}
         <MenuSection title="Mon compte">
           <MenuItem

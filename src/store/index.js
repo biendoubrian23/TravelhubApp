@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import { bookingService } from '../services/bookingService'
+import { balanceService } from '../services/balanceService'
 import logger from '../utils/logger'
 
 // Store d'authentification
@@ -730,4 +731,109 @@ export const useBookingStore = create((set, get) => ({
       outboundTrip: state.trip, // Alias pour compatibilité
     }
   }
+}))
+
+// Store pour le solde utilisateur
+export const useBalanceStore = create(devtools((set, get) => ({
+  balance: 0,
+  transactions: [],
+  isLoading: false,
+  lastUpdated: null,
+  
+  // Charger le solde de l'utilisateur
+  loadBalance: async (userId) => {
+    if (!userId) return;
+    
+    set({ isLoading: true });
+    try {
+      const result = await balanceService.getUserBalance(userId);
+      if (result.error) {
+        console.error('Erreur lors du chargement du solde:', result.error);
+        set({ balance: 0, isLoading: false });
+        return { error: result.error };
+      }
+      
+      set({ 
+        balance: result.balance || 0, 
+        isLoading: false,
+        lastUpdated: new Date().toISOString()
+      });
+      
+      return { balance: result.balance || 0, error: null };
+    } catch (error) {
+      console.error('Erreur store solde:', error);
+      set({ balance: 0, isLoading: false });
+      return { error };
+    }
+  },
+  
+  // Charger les transactions de solde
+  loadTransactions: async (userId, limit = 20) => {
+    if (!userId) return;
+    
+    try {
+      const result = await balanceService.getBalanceTransactions(userId, limit);
+      if (result.error) {
+        console.error('Erreur lors du chargement des transactions:', result.error);
+        return { error: result.error };
+      }
+      
+      set({ transactions: result.data || [] });
+      return { transactions: result.data || [], error: null };
+    } catch (error) {
+      console.error('Erreur store transactions:', error);
+      set({ transactions: [] });
+      return { error };
+    }
+  },
+  
+  // Mettre à jour le solde local (après une transaction)
+  updateBalance: (newBalance) => {
+    set({ 
+      balance: newBalance,
+      lastUpdated: new Date().toISOString()
+    });
+  },
+  
+  // Ajouter une transaction au store local
+  addTransaction: (transaction) => {
+    set(state => ({
+      transactions: [transaction, ...state.transactions]
+    }));
+  },
+  
+  // Calculer la répartition du paiement avec le solde
+  calculatePaymentBreakdown: (totalAmount) => {
+    const { balance } = get();
+    const amountFromBalance = Math.min(balance, totalAmount);
+    const amountToPay = Math.max(0, totalAmount - amountFromBalance);
+    
+    return {
+      userBalance: balance,
+      amountFromBalance,
+      amountToPay,
+      canUseBalance: balance > 0,
+      balanceSufficient: balance >= totalAmount
+    };
+  },
+  
+  // Simuler l'utilisation du solde
+  useBalance: (amount) => {
+    const { balance } = get();
+    if (balance >= amount) {
+      set({ balance: balance - amount });
+      return true;
+    }
+    return false;
+  },
+  
+  // Réinitialiser le store
+  reset: () => set({
+    balance: 0,
+    transactions: [],
+    isLoading: false,
+    lastUpdated: null
+  })
+}), {
+  name: 'balance-store'
 }))
