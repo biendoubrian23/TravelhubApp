@@ -26,6 +26,12 @@ const lightTheme = {
 }
 
 export default function App() {
+  console.log('App component rendering...')
+  
+  useEffect(() => {
+    console.log('App component mounted')
+  }, [])
+  
   // Note: L'initialisation du bucket avatars doit être faite via SQL côté Supabase
   // pour éviter les erreurs de permissions RLS
   

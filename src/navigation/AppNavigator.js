@@ -18,6 +18,7 @@ import BookingsScreen from '../screens/Bookings/BookingsScreen';
 import BookingDetailsScreen from '../screens/Bookings/BookingDetailsScreen';
 import CancellationConfirmationScreen from '../screens/Bookings/CancellationConfirmationScreen';
 import FavoritesScreen from '../screens/Favorites/FavoritesScreen';
+import PromotionsScreen from '../screens/Promotions/PromotionsScreen';
 import SupabaseTestScreen from '../screens/SupabaseTestScreen';
 import RealtimeTestScreen from '../screens/RealtimeTestScreenDiagnostic';
 import RealDataTestScreen from '../screens/RealDataTestScreen';
@@ -72,8 +73,8 @@ const ClientTabNavigator = () => {
             iconName = focused ? 'home' : 'home-outline'
           } else if (route.name === 'Bookings') {
             iconName = focused ? 'ticket' : 'ticket-outline'
-          } else if (route.name === 'Favorites') {
-            iconName = focused ? 'heart' : 'heart-outline'
+          } else if (route.name === 'Promotions') {
+            iconName = focused ? 'gift' : 'gift-outline'
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline'
           }
@@ -100,9 +101,9 @@ const ClientTabNavigator = () => {
         options={{ tabBarLabel: 'Mes trajets' }}
       />
       <Tab.Screen 
-        name="Favorites" 
-        component={FavoritesScreen}
-        options={{ tabBarLabel: 'Favoris' }}
+        name="Promotions" 
+        component={PromotionsScreen}
+        options={{ tabBarLabel: 'Promotions' }}
       />
       <Tab.Screen 
         name="Profile" 
@@ -115,10 +116,24 @@ const ClientTabNavigator = () => {
 
 // Stack Navigator principal
 const AppNavigator = () => {
+  console.log('🚀 AppNavigator component rendering...')
+  
+  // Réactiver le système d'authentification
   const { user, isLoading, isAuthenticated, initialize } = useAuthStore()
   const [hasInitialized, setHasInitialized] = React.useState(false)
-  const [isAuthenticating, setIsAuthenticating] = useState(false)
-  const [authFailed, setAuthFailed] = useState(false)
+  
+  console.log('🔍 AppNavigator - États (mode debug):', { 
+    isLoading, 
+    hasInitialized, 
+    isAuthenticated, 
+    userExists: !!user 
+  })
+
+  console.log('🔍 AppNavigator - État auth:', { 
+    isAuthenticated, 
+    hasUser: !!user, 
+    userEmail: user?.email 
+  })
 
   useEffect(() => {
     const init = async () => {
@@ -132,6 +147,7 @@ const AppNavigator = () => {
       } catch (error) {
         console.error('❌ Erreur lors de l\'initialisation de la session:', error)
       } finally {
+        console.log('🏁 Setting hasInitialized to true')
         setHasInitialized(true)
       }
     }
@@ -139,17 +155,17 @@ const AppNavigator = () => {
   }, [])
 
   // Écran de chargement minimal pendant l'initialisation
-  if (isLoading || !hasInitialized || isAuthenticating) {
+  if (isLoading || !hasInitialized) {
+    console.log('⏳ Affichage de l\'écran de chargement')
     return (
       <View style={[styles.loadingContainer, { backgroundColor: COLORS.surface }]}>
         <ActivityIndicator size="small" color={COLORS.primary} />
-        {isAuthenticating && (
-          <Text style={styles.loadingText}>Vérification de l'identité...</Text>
-        )}
+        <Text style={styles.loadingText}>Chargement...</Text>
       </View>
     )
   }
   
+  /*
   // Si l'authentification a échoué, afficher un écran bloquant
   if (authFailed) {
     return (
@@ -163,11 +179,11 @@ const AppNavigator = () => {
           style={styles.authRetryButton}
           onPress={async () => {
             setIsAuthenticating(true);
-            const authResult = await deviceSecurityService.authenticate();
+            // const authResult = await deviceSecurityService.authenticate();
             setIsAuthenticating(false);
-            if (authResult.success) {
+            // if (authResult.success) {
               setAuthFailed(false);
-            }
+            // }
           }}
         >
           <Text style={styles.authRetryButtonText}>Réessayer</Text>
@@ -175,6 +191,7 @@ const AppNavigator = () => {
       </View>
     );
   }
+  */
 
   console.log('🔍 AppNavigator - État auth:', { 
     isAuthenticated, 
