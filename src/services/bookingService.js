@@ -203,7 +203,63 @@ export const bookingService = {
 
       const unavailableSeats = existingSeats?.filter(seat => !seat.is_available) || [];
       if (unavailableSeats.length > 0) {
-        throw new Error(`Sièges déjà occupés: ${unavailableSeats.map(s => s.seat_number).join(', ')}`);
+        console.log('⚠️ Sièges marqués comme occupés détectés:', unavailableSeats.map(s => s.seat_number));
+        
+        // 🔍 VÉRIFICATION AVANCÉE : Vérifier s'il y a vraiment des réservations pour ces sièges
+        console.log('🔍 Vérification des réservations existantes pour ces sièges...');
+        
+        const { data: existingBookings, error: bookingCheckError } = await supabase
+          .from('bookings')
+          .select('seat_number, booking_status')
+          .eq('trip_id', bookingData.tripId)
+          .in('seat_number', unavailableSeats.map(s => s.seat_number))
+          .in('booking_status', ['confirmed', 'pending']); // Seulement les réservations actives
+          
+        console.log('📋 Réservations trouvées:', existingBookings);
+        
+        if (bookingCheckError) {
+          console.error('❌ Erreur vérification réservations:', bookingCheckError);
+          // En cas d'erreur, on garde le comportement par défaut
+          throw new Error(`Sièges déjà occupés: ${unavailableSeats.map(s => s.seat_number).join(', ')}`);
+        }
+        
+        // Identifier les sièges "fantômes" (marqués occupés mais sans réservation active)
+        const seatsWithBookings = existingBookings?.map(b => b.seat_number) || [];
+        const ghostSeats = unavailableSeats.filter(seat => 
+          !seatsWithBookings.includes(seat.seat_number)
+        );
+        
+        if (ghostSeats.length > 0) {
+          console.log('👻 Sièges fantômes détectés (occupés sans réservation):', ghostSeats.map(s => s.seat_number));
+          console.log('🔄 Libération automatique des sièges fantômes...');
+          
+          // Libérer les sièges fantômes
+          const { error: cleanupError } = await supabase
+            .from('seat_maps')
+            .update({ is_available: true })
+            .eq('trip_id', bookingData.tripId)
+            .in('seat_number', ghostSeats.map(s => s.seat_number));
+            
+          if (cleanupError) {
+            console.error('❌ Erreur lors du nettoyage des sièges fantômes:', cleanupError);
+          } else {
+            console.log('✅ Sièges fantômes libérés:', ghostSeats.map(s => s.seat_number).join(', '));
+          }
+          
+          // Mettre à jour la liste des sièges non disponibles
+          const reallyUnavailableSeats = unavailableSeats.filter(seat => 
+            seatsWithBookings.includes(seat.seat_number)
+          );
+          
+          if (reallyUnavailableSeats.length > 0) {
+            throw new Error(`Sièges déjà occupés: ${reallyUnavailableSeats.map(s => s.seat_number).join(', ')}`);
+          }
+          
+          console.log('✅ Tous les sièges sont maintenant disponibles après nettoyage');
+        } else {
+          // Tous les sièges occupés ont vraiment des réservations
+          throw new Error(`Sièges déjà occupés: ${unavailableSeats.map(s => s.seat_number).join(', ')}`);
+        }
       }
 
       // Marquer tous les sièges comme occupés d'abord
@@ -272,7 +328,14 @@ export const bookingService = {
           booking_reference: `TH${Date.now()}-${i + 1}`, // Référence unique pour chaque réservation
           booking_status: 'confirmed',
           payment_status: 'pending',
-          payment_method: bookingData.paymentMethod || 'orange_money' // Ajouter le moyen de paiement
+          payment_method: bookingData.paymentMethod || 'orange_money' // Méthode de paiement de base
+          // Temporairement retiré les détails mixtes jusqu'à ce que les colonnes soient ajoutées
+          // ...(bookingData.paymentMethod === 'mixed' && bookingData.mixedPaymentDetails ? {
+          //   mixed_payment_balance_amount: bookingData.mixedPaymentDetails.amountFromBalance,
+          //   mixed_payment_mobile_amount: bookingData.mixedPaymentDetails.amountFromMobileMoney,
+          //   mixed_payment_mobile_provider: bookingData.mixedPaymentDetails.mobilMoneyProvider,
+          //   mixed_payment_phone: bookingData.mixedPaymentDetails.phoneNumber
+          // } : {})
         };
 
         console.log(`Création réservation ${i + 1}/${finalSeatNumbers.length} pour siège ${seatNumber}:`, reservationData);
@@ -318,7 +381,107 @@ export const bookingService = {
       
     } catch (error) {
       console.error('❌ ERREUR GÉNÉRALE createMultipleBookings:', error);
+      
+      // 🔧 ROLLBACK : Libérer les sièges marqués comme occupés en cas d'erreur
+      if (finalSeatNumbers && finalSeatNumbers.length > 0 && bookingData.tripId) {
+        console.log('🔄 ROLLBACK : Libération des sièges suite à l\'erreur...');
+        console.log('- Sièges à libérer:', finalSeatNumbers);
+        console.log('- Trip ID:', bookingData.tripId);
+        
+        try {
+          const { error: rollbackError } = await supabase
+            .from('seat_maps')
+            .update({ is_available: true })
+            .eq('trip_id', bookingData.tripId)
+            .in('seat_number', finalSeatNumbers);
+            
+          if (rollbackError) {
+            console.error('❌ Erreur lors du rollback des sièges:', rollbackError);
+          } else {
+            console.log('✅ Sièges libérés avec succès:', finalSeatNumbers.join(', '));
+          }
+        } catch (rollbackError) {
+          console.error('❌ Erreur critique lors du rollback:', rollbackError);
+        }
+      }
+      
       throw error;
+    }
+  },
+
+  /**
+   * 🧹 Nettoyage des sièges fantômes pour un voyage
+   * Libère les sièges marqués comme occupés mais sans réservation active
+   */
+  async cleanupGhostSeats(tripId) {
+    try {
+      console.log('🧹 Début du nettoyage des sièges fantômes pour le voyage:', tripId);
+      
+      // 1. Récupérer tous les sièges marqués comme occupés
+      const { data: occupiedSeats, error: seatsError } = await supabase
+        .from('seat_maps')
+        .select('seat_number, is_available')
+        .eq('trip_id', tripId)
+        .eq('is_available', false);
+        
+      if (seatsError) {
+        console.error('❌ Erreur lors de la récupération des sièges:', seatsError);
+        return { error: seatsError };
+      }
+      
+      if (!occupiedSeats || occupiedSeats.length === 0) {
+        console.log('✅ Aucun siège occupé trouvé');
+        return { cleaned: 0 };
+      }
+      
+      console.log('📋 Sièges marqués comme occupés:', occupiedSeats.map(s => s.seat_number));
+      
+      // 2. Vérifier quels sièges ont vraiment des réservations actives
+      const { data: activeBookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('seat_number')
+        .eq('trip_id', tripId)
+        .in('seat_number', occupiedSeats.map(s => s.seat_number))
+        .in('booking_status', ['confirmed', 'pending']);
+        
+      if (bookingsError) {
+        console.error('❌ Erreur lors de la vérification des réservations:', bookingsError);
+        return { error: bookingsError };
+      }
+      
+      const seatsWithBookings = activeBookings?.map(b => b.seat_number) || [];
+      console.log('📝 Sièges avec réservations actives:', seatsWithBookings);
+      
+      // 3. Identifier les sièges fantômes
+      const ghostSeats = occupiedSeats
+        .filter(seat => !seatsWithBookings.includes(seat.seat_number))
+        .map(seat => seat.seat_number);
+        
+      if (ghostSeats.length === 0) {
+        console.log('✅ Aucun siège fantôme trouvé');
+        return { cleaned: 0 };
+      }
+      
+      console.log('👻 Sièges fantômes détectés:', ghostSeats);
+      
+      // 4. Libérer les sièges fantômes
+      const { error: cleanupError } = await supabase
+        .from('seat_maps')
+        .update({ is_available: true })
+        .eq('trip_id', tripId)
+        .in('seat_number', ghostSeats);
+        
+      if (cleanupError) {
+        console.error('❌ Erreur lors de la libération des sièges fantômes:', cleanupError);
+        return { error: cleanupError };
+      }
+      
+      console.log('✅ Sièges fantômes libérés:', ghostSeats.join(', '));
+      return { cleaned: ghostSeats.length, seats: ghostSeats };
+      
+    } catch (error) {
+      console.error('❌ Erreur dans cleanupGhostSeats:', error);
+      return { error };
     }
   },
 

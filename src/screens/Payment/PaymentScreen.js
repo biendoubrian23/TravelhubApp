@@ -78,92 +78,170 @@ const PaymentScreen = ({ route, navigation }) => {
       return;
     }
     
+    // Validation pour mobile money en paiement mixte
+    if ((selectedMixedPaymentMethod === 'orange_money' || selectedMixedPaymentMethod === 'mtn_momo') && !phoneNumber) {
+      Alert.alert('Erreur', 'Veuillez saisir votre numéro de téléphone pour le paiement mobile money.');
+      return;
+    }
+    
     try {
       setProcessing(true);
       const { useAuthStore } = require('../../store');
       const { balanceService } = require('../../services/balanceService');
+      const { bookingService } = require('../../services/bookingService');
       const { user } = useAuthStore.getState();
       
+      console.log('🔄 Début paiement mixte:', {
+        userBalance,
+        totalPrice,
+        remainingAmount,
+        selectedMixedPaymentMethod,
+        phoneNumber: selectedMixedPaymentMethod.includes('money') ? phoneNumber : 'N/A'
+      });
+      
+      // Mapper les sièges sélectionnés de façon sécurisée (même logique que mobile money)
+      let mappedSeats = [];
+      if (Array.isArray(selectedSeats)) {
+        mappedSeats = selectedSeats.map(seat => {
+          const seatNumber = seat.seat_number || seat.number || seat;
+          return String(seatNumber);
+        });
+      } else if (selectedSeats) {
+        const seatNumber = selectedSeats.seat_number || selectedSeats.number || selectedSeats;
+        mappedSeats = [String(seatNumber)];
+      } else {
+        console.error('❌ Aucun siège sélectionné trouvé');
+        Alert.alert('Erreur', 'Aucun siège sélectionné');
+        setProcessing(false);
+        return;
+      }
+      
+      // Étape 1: Utiliser le solde disponible pour débiter la partie solde
+      const amountFromBalance = Math.min(userBalance, totalPrice);
+      const amountToPay = totalPrice - amountFromBalance;
+      
+      console.log('💰 Calculs paiement mixte:', {
+        amountFromBalance,
+        amountToPay,
+        mappedSeats
+      });
+      
+      // Étape 2: Débiter le solde d'abord
+      if (amountFromBalance > 0) {
+        const debitResult = await balanceService.debitBalance(
+          user.id,
+          amountFromBalance,
+          `Paiement réservation - Partie solde (${mappedSeats.join(', ')})`,
+          null // On aura l'ID de réservation plus tard
+        );
+        
+        if (!debitResult.success) {
+          Alert.alert('Erreur', 'Échec du débit du solde. Veuillez réessayer.');
+          setProcessing(false);
+          return;
+        }
+        
+        console.log('✅ Solde débité:', amountFromBalance, 'FCFA');
+      }
+      
+      // Étape 3: Simuler le paiement mobile money pour le montant restant
+      if (amountToPay > 0 && (selectedMixedPaymentMethod === 'orange_money' || selectedMixedPaymentMethod === 'mtn_momo')) {
+        console.log('🔄 Simulation paiement mobile money pour:', amountToPay, 'FCFA');
+        
+        // Simuler le temps de traitement mobile money
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        console.log('✅ Paiement mobile money simulé avec succès');
+      }
+      
+      // Étape 4: Créer la réservation avec les informations complètes
       const bookingData = {
         userId: user?.id,
         tripId: trip?.id || outboundTrip?.id,
-        seatNumbers: selectedSeats.map(seat => seat.seat_number || seat.number),
+        seatNumbers: mappedSeats,
         totalPrice: totalPrice,
-        paymentMethod: selectedMixedPaymentMethod
+        paymentMethod: 'mixed', // Identifier comme paiement mixte
+        mixedPaymentDetails: {
+          amountFromBalance,
+          amountFromMobileMoney: amountToPay,
+          mobilMoneyProvider: selectedMixedPaymentMethod,
+          phoneNumber: (selectedMixedPaymentMethod === 'orange_money' || selectedMixedPaymentMethod === 'mtn_momo') ? phoneNumber : null
+        }
       };
       
-      console.log('🔄 Traitement paiement mixte:', {
-        userId: bookingData.userId,
-        tripId: bookingData.tripId,
-        seatNumbers: bookingData.seatNumbers,
-        totalPrice: bookingData.totalPrice,
-        userBalance,
-        remainingAmount,
-        paymentMethod: selectedMixedPaymentMethod
-      });
+      console.log('🚀 Création réservation paiement mixte:', bookingData);
       
-      const result = await balanceService.processPaymentWithBalance(
-        bookingData.userId, 
-        bookingData.tripId, 
-        bookingData.seatNumbers, 
-        bookingData.totalPrice, 
-        bookingData.paymentMethod
-      );
+      const result = await bookingService.createMultipleBookings(bookingData);
       
       if (result.success) {
         // Fermer le modal
         setShowMixedPaymentModal(false);
         
-        // Si tout le solde a été utilisé et qu'il reste un montant à payer
-        if (result.data.amountFromBalance > 0 && result.data.amountToPay > 0) {
-          // Continuer avec le paiement du montant restant
-          // Dans un cas réel, on dirigerait vers le processeur de paiement
-          Alert.alert(
-            'Solde appliqué',
-            `${result.data.amountFromBalance.toLocaleString()} FCFA ont été débités de votre solde. Veuillez procéder au paiement du montant restant (${result.data.amountToPay.toLocaleString()} FCFA) avec ${getPaymentMethodName(selectedMixedPaymentMethod)}.`,
-            [
-              {
-                text: 'Continuer',
-                onPress: () => {
-                  // Simuler un paiement réussi après un délai pour démonstration
-                  setTimeout(() => {
-                    navigation.navigate('PaymentSuccess', {
-                      bookingReference: result.data.bookingId,
-                      totalPrice,
-                      amountFromBalance: result.data.amountFromBalance,
-                      amountPaid: result.data.amountToPay,
-                      tripDetails: trip || outboundTrip,
-                      paymentMethod: `Solde (${result.data.amountFromBalance.toLocaleString()} FCFA) + ${getPaymentMethodName(selectedMixedPaymentMethod)}`,
-                      reservationDate: new Date().toISOString(),
-                      selectedSeats: bookingData.seatNumbers,
-                      tripId: bookingData.tripId,
-                      skipBookingCreation: true // Flag pour éviter de créer à nouveau les réservations
-                    });
-                  }, 2000);
-                }
-              }
-            ]
-          );
+        // Créer le libellé de méthode de paiement
+        let paymentMethodLabel = '';
+        if (amountFromBalance > 0 && amountToPay > 0) {
+          const mobileMethodName = selectedMixedPaymentMethod === 'orange_money' ? 'Orange Money' : 'MTN Mobile Money';
+          paymentMethodLabel = `Mixte: Solde (${amountFromBalance.toLocaleString()} FCFA) + ${mobileMethodName} (${amountToPay.toLocaleString()} FCFA)`;
+        } else if (amountFromBalance > 0) {
+          paymentMethodLabel = `Solde (${amountFromBalance.toLocaleString()} FCFA)`;
         } else {
-          navigation.navigate('PaymentSuccess', {
-            bookingReference: result.data.bookingId,
-            totalPrice,
-            amountFromBalance: result.data.amountFromBalance,
-            amountPaid: result.data.amountToPay,
-            tripDetails: trip || outboundTrip,
-            paymentMethod: `Solde utilisateur`,
-            reservationDate: new Date().toISOString(),
-            selectedSeats: bookingData.seatNumbers,
-            tripId: bookingData.tripId,
-            skipBookingCreation: true // Flag pour éviter de créer à nouveau les réservations
-          });
+          paymentMethodLabel = selectedMixedPaymentMethod === 'orange_money' ? 'Orange Money' : 'MTN Mobile Money';
         }
+        
+        // Rediriger vers l'écran de succès
+        navigation.replace('PaymentSuccess', {
+          bookingReference: result.bookingReference,
+          totalPrice: totalPrice,
+          amountFromBalance: amountFromBalance,
+          amountPaid: amountToPay,
+          tripDetails: trip || outboundTrip,
+          paymentMethod: paymentMethodLabel,
+          reservationDate: new Date().toISOString(),
+          selectedSeats: mappedSeats,
+          tripId: trip?.id || outboundTrip?.id,
+          paymentType: 'mixed_payment',
+          mixedPaymentDetails: bookingData.mixedPaymentDetails
+        });
+        
       } else {
-        Alert.alert('Erreur', 'Le paiement a échoué. Veuillez réessayer.');
+        Alert.alert('Erreur', 'La création de la réservation a échoué. Veuillez réessayer.');
+        
+        // En cas d'échec, rembourser le solde débité et libérer les sièges
+        if (amountFromBalance > 0) {
+          console.log('🔄 Remboursement du solde débité suite à l\'échec...');
+          await balanceService.addToBalance(
+            user.id,
+            amountFromBalance,
+            'Remboursement suite à échec de réservation'
+          );
+        }
+        
+        // Libérer les sièges en cas d'échec (ils ont pu être marqués comme occupés)
+        console.log('🔄 Tentative de libération des sièges suite à l\'échec...');
+        // Note: La logique de libération est maintenant dans bookingService.createMultipleBookings
       }
     } catch (error) {
       console.error('❌ Erreur lors du paiement mixte:', error);
       Alert.alert('Erreur', 'Une erreur est survenue lors du paiement.');
+      
+      // En cas d'erreur, essayer de rembourser le solde si il a été débité
+      try {
+        const { useAuthStore } = require('../../store');
+        const { balanceService } = require('../../services/balanceService');
+        const { user } = useAuthStore.getState();
+        const amountFromBalance = Math.min(userBalance, totalPrice);
+        
+        if (amountFromBalance > 0) {
+          console.log('🔄 Remboursement du solde suite à erreur...');
+          await balanceService.addToBalance(
+            user.id,
+            amountFromBalance,
+            'Remboursement suite à erreur de paiement'
+          );
+        }
+      } catch (refundError) {
+        console.error('❌ Erreur lors du remboursement:', refundError);
+      }
     } finally {
       setProcessing(false);
     }
@@ -1028,6 +1106,35 @@ const PaymentScreen = ({ route, navigation }) => {
                   ))}
               </View>
             </View>
+
+            {/* Formulaire pour Mobile Money si sélectionné */}
+            {(selectedMixedPaymentMethod === 'orange_money' || selectedMixedPaymentMethod === 'mtn_momo') && (
+              <View style={styles.formContainer}>
+                <Text style={styles.formTitle}>
+                  {selectedMixedPaymentMethod === 'orange_money' ? 'Orange Money' : 'MTN Mobile Money'}
+                </Text>
+                
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Numéro de téléphone</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={phoneNumber}
+                    onChangeText={setPhoneNumber}
+                    placeholder="Exemple: 6xxxxxxxx"
+                    placeholderTextColor={COLORS.text.secondary}
+                    keyboardType="phone-pad"
+                    maxLength={9}
+                  />
+                </View>
+                
+                <View style={styles.infoBox}>
+                  <Ionicons name="information-circle" size={20} color={COLORS.warning} />
+                  <Text style={styles.infoText}>
+                    Vous recevrez une notification sur votre téléphone pour valider le paiement de {remainingAmount.toLocaleString()} FCFA.
+                  </Text>
+                </View>
+              </View>
+            )}
           </ScrollView>
           
           {/* Footer avec bouton de paiement */}

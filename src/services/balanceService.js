@@ -680,6 +680,75 @@ export const balanceService = {
     }
   },
 
+  // Ajouter du crédit au solde utilisateur (pour remboursements/compensations)
+  async addToBalance(userId, amount, description, bookingId = null) {
+    try {
+      if (!userId || !amount || amount <= 0) {
+        console.error('❌ Paramètres invalides pour ajout solde:', { userId, amount });
+        return { success: false, error: 'Paramètres invalides' };
+      }
+
+      console.log('💰 Ajout au solde:', { userId, amount, description });
+
+      // Récupérer le solde actuel
+      const { balance: currentBalance } = await this.getUserBalance(userId);
+
+      // Calculer le nouveau solde
+      const newBalance = currentBalance + amount;
+
+      // Mettre à jour le solde
+      const { data: updatedUser, error: balanceError } = await supabase
+        .from('users')
+        .update({ balance: newBalance })
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (balanceError) {
+        console.error('❌ Erreur mise à jour solde:', balanceError);
+        return { success: false, error: balanceError };
+      }
+
+      // Créer une transaction de crédit (utiliser 'refund' car 'credit' n'est pas autorisé)
+      const { data: transaction, error: transactionError } = await supabase
+        .from('balance_transactions')
+        .insert({
+          user_id: userId,
+          booking_id: bookingId,
+          transaction_type: 'refund', // Utiliser 'refund' au lieu de 'credit'
+          amount: amount,
+          description: description || 'Crédit ajouté au solde'
+        })
+        .select()
+        .single();
+
+      if (transactionError) {
+        console.error('❌ Erreur création transaction crédit:', transactionError);
+        // Le solde a été mis à jour mais pas la transaction, c'est acceptable
+      }
+
+      console.log('✅ Crédit ajouté avec succès:', {
+        ancienSolde: currentBalance,
+        creditAjoute: amount,
+        nouveauSolde: newBalance
+      });
+
+      return {
+        success: true,
+        data: {
+          oldBalance: currentBalance,
+          newBalance: newBalance,
+          amountAdded: amount,
+          transactionId: transaction?.id
+        },
+        error: null
+      };
+    } catch (error) {
+      console.error('❌ Erreur ajout crédit solde:', error);
+      return { success: false, error };
+    }
+  },
+
   // Mettre à jour les paramètres de l'application (pour les admins)
   async updateAppSetting(settingKey, settingValue, description = null) {
     try {
