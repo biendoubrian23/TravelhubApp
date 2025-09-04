@@ -183,6 +183,22 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
     .map(adaptBookingData)
     .filter(booking => booking !== null);
 
+  // Fonction pour vérifier si un trajet est passé
+  const isBookingDatePassed = (booking) => {
+    if (!booking || !booking.trip || !booking.trip.departure_time) return false;
+    
+    // Obtenir la date actuelle à minuit pour comparer juste les dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Obtenir la date de la réservation (voyage)
+    const bookingDate = new Date(booking.trip.departure_time);
+    bookingDate.setHours(0, 0, 0, 0);
+    
+    // Vérifier si la date est passée
+    return bookingDate < today;
+  };
+
   const filteredBookings = adaptedBookings.filter(booking => {
     // Protection supplémentaire contre les objets mal formés
     if (!booking || !booking.trip) {
@@ -200,9 +216,21 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
     
     if (filter === 'all') return matchesSearch;
     
-    // Les réservations annulées vont dans "Terminés"
+    // Vérifier si la date est passée
+    const dateIsPassed = isBookingDatePassed(booking);
+    
+    // Les réservations annulées et les trajets passés vont dans "Terminés"
     if (filter === 'completed') {
-      return matchesSearch && (booking.booking_status === 'completed' || booking.booking_status === 'cancelled');
+      return matchesSearch && (
+        booking.booking_status === 'completed' || 
+        booking.booking_status === 'cancelled' || 
+        (booking.booking_status === 'confirmed' && dateIsPassed)
+      );
+    }
+    
+    // Pour "Confirmés", ne pas montrer les trajets passés
+    if (filter === 'confirmed') {
+      return matchesSearch && booking.booking_status === 'confirmed' && !dateIsPassed;
     }
     
     return matchesSearch && booking.booking_status === filter;
@@ -448,15 +476,24 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
         {/* Actions */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: SPACING.xs }}>
           <View style={{ flex: 1 }}>
-            <Button 
-              mode="outlined" 
-              onPress={() => navigation.navigate('BookingDetails', { bookingId: booking.id })}
-              style={buttonStyle}
-              labelStyle={buttonLabelStyle}
-              contentStyle={{ height: 36 }}
-            >
-              Détails
-            </Button>
+            {/* Vérifier si la date de réservation est passée */}
+            {(() => {
+              // On utilise la fonction définie plus haut
+              const isDatePassed = isBookingDatePassed(booking);
+              
+              return (
+                <Button 
+                  mode="outlined" 
+                  onPress={() => navigation.navigate('BookingDetails', { bookingId: booking.id })}
+                  style={[buttonStyle, isDatePassed && { opacity: 0.5 }]}
+                  labelStyle={buttonLabelStyle}
+                  contentStyle={{ height: 36 }}
+                  disabled={isDatePassed}
+                >
+                  {isDatePassed ? "Passé" : "Détails"}
+                </Button>
+              );
+            })()}
           </View>
           
           {booking.booking_status === 'confirmed' && (
