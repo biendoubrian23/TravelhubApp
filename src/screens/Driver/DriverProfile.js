@@ -41,12 +41,13 @@ const DriverProfile = ({ navigation }) => {
     );
   };
 
+  // Interface simplifiée avec seulement 3 sections essentielles
   const profileSections = [
     {
       title: 'Disponibilité',
       items: [
         {
-          icon: 'checkmark-circle-outline',
+          icon: 'car-outline',
           title: 'Statut conducteur',
           subtitle: isAvailable ? 'Disponible pour les trajets' : 'Non disponible',
           type: 'switch',
@@ -69,78 +70,14 @@ const DriverProfile = ({ navigation }) => {
       ]
     },
     {
-      title: 'Mes informations',
-      items: [
-        {
-          icon: 'person-outline',
-          title: 'Modifier mon profil',
-          subtitle: 'Nom, téléphone, photo',
-          type: 'navigation',
-          onPress: () => navigation.navigate('EditDriverProfile'),
-        },
-        {
-          icon: 'shield-outline',
-          title: 'Sécurité',
-          subtitle: 'Mot de passe, authentification',
-          type: 'navigation',
-          onPress: () => navigation.navigate('DriverSecurity'),
-        },
-      ]
-    },
-    {
       title: 'Documents',
       items: [
         {
-          icon: 'card-outline',
-          title: 'Permis de conduire',
-          subtitle: 'Gérer mes documents',
+          icon: 'document-text-outline',
+          title: 'Permis et documents',
+          subtitle: 'Gérer tous mes documents',
           type: 'navigation',
           onPress: () => navigation.navigate('DriverDocuments'),
-        },
-        {
-          icon: 'car-outline',
-          title: 'Informations véhicule',
-          subtitle: 'Carte grise, assurance',
-          type: 'navigation',
-          onPress: () => navigation.navigate('VehicleInfo'),
-        },
-      ]
-    },
-    {
-      title: 'Support',
-      items: [
-        {
-          icon: 'help-circle-outline',
-          title: 'Centre d\'aide',
-          subtitle: 'Questions fréquentes',
-          type: 'navigation',
-          onPress: () => navigation.navigate('DriverHelp'),
-        },
-        {
-          icon: 'mail-outline',
-          title: 'Contacter le support',
-          subtitle: 'Nous sommes là pour vous aider',
-          type: 'navigation',
-          onPress: () => navigation.navigate('ContactSupport'),
-        },
-      ]
-    },
-    {
-      title: 'À propos',
-      items: [
-        {
-          icon: 'information-circle-outline',
-          title: 'Conditions d\'utilisation',
-          subtitle: 'Termes et conditions',
-          type: 'navigation',
-          onPress: () => navigation.navigate('DriverTerms'),
-        },
-        {
-          icon: 'shield-checkmark-outline',
-          title: 'Politique de confidentialité',
-          subtitle: 'Protection de vos données',
-          type: 'navigation',
-          onPress: () => navigation.navigate('DriverPrivacy'),
         },
       ]
     }

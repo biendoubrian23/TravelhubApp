@@ -2,6 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import DriverDashboard from './DriverDashboard';
+import PassengersList from './PassengersList';
 import DriverProfile from './DriverProfile';
 
 const Tab = createBottomTabNavigator();
@@ -15,6 +16,8 @@ const DriverTabNavigator = () => {
 
           if (route.name === 'Dashboard') {
             iconName = focused ? 'speedometer' : 'speedometer-outline';
+          } else if (route.name === 'Passengers') {
+            iconName = focused ? 'people' : 'people-outline';
           } else if (route.name === 'DriverProfile') {
             iconName = focused ? 'person' : 'person-outline';
           }
@@ -42,6 +45,11 @@ const DriverTabNavigator = () => {
         name="Dashboard" 
         component={DriverDashboard}
         options={{ tabBarLabel: 'Tableau de bord' }}
+      />
+      <Tab.Screen 
+        name="Passengers" 
+        component={PassengersList}
+        options={{ tabBarLabel: 'Passagers' }}
       />
       <Tab.Screen 
         name="DriverProfile" 
