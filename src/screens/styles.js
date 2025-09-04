@@ -99,6 +99,148 @@ export default StyleSheet.create({
     width: 250,
     marginRight: 15,
   },
+
+  // Section avis clients compacte
+  reviewsSection: {
+    marginVertical: 15,
+  },
+  reviewsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+    paddingHorizontal: 20,
+  },
+  ratingOverview: {
+    alignItems: 'flex-end',
+  },
+  starRating: {
+    flexDirection: 'row',
+    marginBottom: 2,
+  },
+  ratingText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  reviewsHorizontal: {
+    paddingHorizontal: 20,
+  },
+  compactReviewItem: {
+    width: 280,
+    marginRight: 12,
+  },
+
+  // Carte avis compacte
+  compactTestimonialCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
+    height: 110,
+  },
+  compactHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  compactAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 10,
+    backgroundColor: '#F3F4F6',
+  },
+  compactUserInfo: {
+    flex: 1,
+  },
+  compactName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  compactRating: {
+    flexDirection: 'row',
+  },
+  compactComment: {
+    fontSize: 13,
+    color: '#4B5563',
+    lineHeight: 18,
+    flex: 1,
+  },
+
+  // Carte avis optimisée
+  optimizedTestimonialCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  testimonialQuote: {
+    marginBottom: 12,
+  },
+  optimizedComment: {
+    fontSize: 15,
+    color: '#374151',
+    lineHeight: 22,
+    marginBottom: 16,
+    fontStyle: 'normal',
+  },
+  optimizedTestimonialFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  optimizedUserInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  optimizedAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  optimizedUserDetails: {
+    flex: 1,
+  },
+  optimizedName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  optimizedCity: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  optimizedRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   
   // Featured Cards - Style similaire aux destinations
   featuredCard: {

@@ -262,6 +262,58 @@ const UberStylePromotions = () => {
     </LinearGradient>
   );
 
+  const renderCompactTestimonialCard = (item) => (
+    <View style={styles.compactTestimonialCard}>
+      <View style={styles.compactHeader}>
+        <Image source={{ uri: item.avatar }} style={styles.compactAvatar} />
+        <View style={styles.compactUserInfo}>
+          <Text style={styles.compactName}>{item.name}</Text>
+          <View style={styles.compactRating}>
+            {[...Array(5)].map((_, i) => (
+              <Ionicons
+                key={i}
+                name="star"
+                size={10}
+                color={i < item.rating ? "#FFB800" : "#E5E7EB"}
+              />
+            ))}
+          </View>
+        </View>
+      </View>
+      <Text style={styles.compactComment} numberOfLines={3}>
+        "{item.comment}"
+      </Text>
+    </View>
+  );
+
+  const renderOptimizedTestimonialCard = (item) => (
+    <View style={styles.optimizedTestimonialCard}>
+      <View style={styles.testimonialQuote}>
+        <Ionicons name="chatbubble-ellipses" size={20} color="#3B82F6" />
+      </View>
+      <Text style={styles.optimizedComment}>{item.comment}</Text>
+      <View style={styles.optimizedTestimonialFooter}>
+        <View style={styles.optimizedUserInfo}>
+          <Image source={{ uri: item.avatar }} style={styles.optimizedAvatar} />
+          <View style={styles.optimizedUserDetails}>
+            <Text style={styles.optimizedName}>{item.name}</Text>
+            <Text style={styles.optimizedCity}>{item.city}</Text>
+          </View>
+        </View>
+        <View style={styles.optimizedRating}>
+          {[...Array(5)].map((_, i) => (
+            <Ionicons
+              key={i}
+              name="star"
+              size={12}
+              color={i < item.rating ? "#FFB800" : "#E5E7EB"}
+            />
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+
   const renderTestimonialCard = (item) => (
     <View style={styles.testimonialCard}>
       <View style={styles.testimonialHeader}>
@@ -361,15 +413,32 @@ const UberStylePromotions = () => {
           </View>
         </View>
 
-        {/* Témoignages - Un seul carrousel plus compact */}
-        <ModernCarousel
-          title="Avis clients"
-          data={testimonials}
-          renderItem={renderTestimonialCard}
-          autoScroll={true}
-          showDots={false}
-          containerStyle={styles.sectionContainer}
-        />
+        {/* Avis clients - Layout compact horizontal */}
+        <View style={styles.reviewsSection}>
+          <View style={styles.reviewsHeader}>
+            <Text style={styles.sectionTitle}>Avis clients</Text>
+            <View style={styles.ratingOverview}>
+              <View style={styles.starRating}>
+                {[...Array(5)].map((_, i) => (
+                  <Ionicons key={i} name="star" size={14} color="#FFB800" />
+                ))}
+              </View>
+              <Text style={styles.ratingText}>4.8 (2,847)</Text>
+            </View>
+          </View>
+          
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.reviewsHorizontal}
+          >
+            {testimonials.map((testimonial, index) => (
+              <View key={index} style={styles.compactReviewItem}>
+                {renderCompactTestimonialCard(testimonial)}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
 
         {/* Offres spéciales - Layout horizontal simple */}
         <View style={styles.offersSection}>
