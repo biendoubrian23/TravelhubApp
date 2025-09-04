@@ -451,15 +451,15 @@ export const useBookingsStore = create(devtools((set, get) => ({
               const trip = booking.trips || {};
               const agency = trip.agencies || {};
               
-              console.log('🔄 Transformation individuelle:', {
-                bookingId: booking.id,
-                bookingRef: booking.booking_reference,
-                siege: booking.seat_number,
-                prix: booking.total_price_fcfa,
-                ville_depart: trip.ville_depart,
-                ville_arrivee: trip.ville_arrivee
-              });
-              
+              // Log seulement les 3 premières transformations pour debug
+              if (data.indexOf(booking) < 3) {
+                console.log('🔄 Transformation (sample):', {
+                  bookingId: booking.id,
+                  bookingRef: booking.booking_reference,
+                  siege: booking.seat_number,
+                  prix: booking.total_price_fcfa
+                });
+              }
               
               return {
                 id: booking.id,

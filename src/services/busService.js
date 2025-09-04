@@ -380,7 +380,7 @@ export const busService = {
   // Réserver temporairement des sièges pour un paiement mixte
   async reserveSeatsTemporarily(tripId, seatNumbers) {
     try {
-      console.log('🔄 Réservation temporaire des sièges:', { tripId, seatNumbers });
+      // console.log('🔄 Réservation temporaire des sièges:', { tripId, seatNumbers });
       
       // Vérifier que les sièges sont disponibles
       const { data: existingSeats, error: seatCheckError } = await supabase
@@ -425,7 +425,7 @@ export const busService = {
   // Libérer les sièges réservés temporairement en cas d'échec
   async releaseSeatsTemporarily(tripId, seatNumbers) {
     try {
-      console.log('🔄 Libération des sièges:', { tripId, seatNumbers });
+      // console.log('🔄 Libération des sièges:', { tripId, seatNumbers });
       
       const { error: releaseError } = await supabase
         .from('seat_maps')

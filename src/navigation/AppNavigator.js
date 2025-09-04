@@ -17,6 +17,7 @@ import ProfileScreen from '../screens/Profile/ProfileScreen';
 import BookingsScreen from '../screens/Bookings/BookingsScreen';
 import BookingDetailsScreen from '../screens/Bookings/BookingDetailsScreen';
 import CancellationConfirmationScreen from '../screens/Bookings/CancellationConfirmationScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 import FavoritesScreen from '../screens/Favorites/FavoritesScreen';
 import PromotionsScreen from '../screens/Promotions/PromotionsScreen';
 import SupabaseTestScreen from '../screens/SupabaseTestScreen';
@@ -116,24 +117,26 @@ const ClientTabNavigator = () => {
 
 // Stack Navigator principal
 const AppNavigator = () => {
-  console.log('🚀 AppNavigator component rendering...')
+  // Réduire les logs pour améliorer les performances
+  // console.log('🚀 AppNavigator component rendering...')
   
   // Réactiver le système d'authentification
   const { user, isLoading, isAuthenticated, initialize } = useAuthStore()
   const [hasInitialized, setHasInitialized] = React.useState(false)
   
-  console.log('🔍 AppNavigator - États (mode debug):', { 
-    isLoading, 
-    hasInitialized, 
-    isAuthenticated, 
-    userExists: !!user 
-  })
+  // Log seulement les changements d'état importants
+  // console.log('🔍 AppNavigator - États (mode debug):', { 
+  //   isLoading, 
+  //   hasInitialized, 
+  //   isAuthenticated, 
+  //   userExists: !!user 
+  // })
 
-  console.log('🔍 AppNavigator - État auth:', { 
-    isAuthenticated, 
-    hasUser: !!user, 
-    userEmail: user?.email 
-  })
+  // console.log('🔍 AppNavigator - État auth:', { 
+  //   isAuthenticated, 
+  //   hasUser: !!user, 
+  //   userEmail: user?.email 
+  // })
 
   useEffect(() => {
     const init = async () => {
@@ -265,6 +268,15 @@ const AppNavigator = () => {
               component={NotificationSettingsScreen}
               options={{
                 title: 'Notifications',
+                presentation: 'card',
+                animationTypeForReplace: 'push',
+              }}
+            />
+            <Stack.Screen 
+              name="Notifications" 
+              component={NotificationsScreen}
+              options={{
+                title: 'Mes Notifications',
                 presentation: 'card',
                 animationTypeForReplace: 'push',
               }}

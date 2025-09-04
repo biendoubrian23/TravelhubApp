@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient'
 
 // Service pour gérer le solde utilisateur
 export const balanceService = {
-  // Variables pour éviter les appels simultanés
+  // Variables pour éviter les appels      // console.log('🔄 Recherche de réservations liées...');simultanés
   _cancellingBookings: new Set(),
   _pendingTransactions: new Set(), // Nouvelle variable pour suivre les transactions en cours de traitement
 
@@ -135,7 +135,7 @@ export const balanceService = {
         return { success: false, error: 'ID de réservation ou utilisateur manquant' };
       }
 
-      console.log('📋 Récupération des détails de la réservation...');
+      // console.log('📋 Récupération des détails de la réservation...');
       
       // Récupérer les détails de la réservation PRINCIPALE
       const { data: booking, error: bookingError } = await supabase
@@ -145,7 +145,7 @@ export const balanceService = {
         .eq('user_id', userId)
         .single()
 
-      console.log('📋 Résultat requête booking:', { booking, bookingError });
+      // console.log('📋 Résultat requête booking:', { booking, bookingError });
 
       if (bookingError || !booking) {
         console.error('❌ Erreur récupération booking:', bookingError);
@@ -167,7 +167,7 @@ export const balanceService = {
         .eq('user_id', userId)
         .neq('booking_status', 'cancelled'); // Exclure les déjà annulées
 
-      console.log('📋 Réservations liées trouvées:', relatedBookings);
+      // console.log('📋 Réservations liées trouvées:', relatedBookings);
 
       if (relatedError) {
         console.error('❌ Erreur recherche réservations liées:', relatedError);
@@ -178,8 +178,8 @@ export const balanceService = {
       const totalBookings = relatedBookings && relatedBookings.length > 0 ? relatedBookings : [booking];
       const totalPriceToRefund = totalBookings.reduce((sum, b) => sum + (b.total_price_fcfa || 0), 0);
       
-      console.log('💰 Calcul des frais d\'annulation...');
-      console.log('💰 Prix total à traiter pour remboursement:', totalPriceToRefund);
+      // console.log('💰 Calcul des frais d\'annulation...');
+      // console.log('💰 Prix total à traiter pour remboursement:', totalPriceToRefund);
       
       // Calculer les frais et le remboursement sur le PRIX TOTAL
       const { feePercent, fee, refund, error: calcError } = await this.calculateCancellationFees(totalPriceToRefund)

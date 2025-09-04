@@ -12,6 +12,7 @@ import { COLORS } from './src/constants'
 
 // Services
 // import avatarService from './src/services/avatarService' // Avatar désactivé temporairement
+import { notificationProcessor } from './src/services/notificationProcessor'
 
 // Thème personnalisé en mode clair uniquement
 const lightTheme = {
@@ -30,6 +31,14 @@ export default function App() {
   
   useEffect(() => {
     console.log('App component mounted')
+    
+    // Démarrer le processeur de notifications
+    notificationProcessor.start()
+    
+    // Nettoyer à la fermeture de l'app
+    return () => {
+      notificationProcessor.stop()
+    }
   }, [])
   
   // Note: L'initialisation du bucket avatars doit être faite via SQL côté Supabase

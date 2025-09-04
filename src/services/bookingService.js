@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient'
 import logger from '../utils/logger'
+import { notificationService } from './notificationService'
 
 export const bookingService = {
   // Vérifier et appliquer le discount de parrainage
@@ -381,6 +382,36 @@ export const bookingService = {
       if (referralInfo.referralId && referralInfo.isFirstBooking) {
         logger.info('🎁 Première réservation d\'un filleul - création de la récompense pour le parrain');
         await this.createReferralReward(referralInfo.referralId, bookingData.userId, 500);
+      }
+
+      // 📱 Créer les notifications de rappel pour chaque réservation
+      try {
+        // Récupérer les données du voyage pour les notifications
+        const { data: tripData, error: tripError } = await supabase
+          .from('trips')
+          .select('departure_time, departure_city, arrival_city')
+          .eq('id', bookingData.tripId)
+          .single();
+
+        if (tripData && !tripError) {
+          for (const booking of createdBookings) {
+            const notificationResult = await notificationService.createBookingReminder({
+              bookingId: booking.id,
+              userId: bookingData.userId,
+              tripData: tripData,
+              bookingReference: booking.booking_reference
+            });
+
+            if (notificationResult.success) {
+              logger.info('📱 Notification de rappel créée pour la réservation:', booking.id);
+            } else {
+              logger.error('❌ Erreur création notification:', notificationResult.error);
+            }
+          }
+        }
+      } catch (notificationError) {
+        logger.error('❌ Erreur lors de la création des notifications:', notificationError);
+        // Ne pas faire échouer la réservation si les notifications échouent
       }
 
       console.log('=== FIN CRÉATION RÉSERVATIONS MULTIPLES ===');
@@ -818,12 +849,13 @@ export const bookingService = {
         return []
       }
 
+      // Log réduit pour les performances
       console.log('📋 Réservations trouvées:', bookingsData.length);
-      console.log('📋 Première réservation:', bookingsData[0]);
+      // console.log('📋 Première réservation:', bookingsData[0]);
 
       // Ensuite récupérer les informations des trajets séparément
       const tripIds = [...new Set(bookingsData.map(booking => booking.trip_id).filter(Boolean))]
-      console.log('🚌 Trip IDs à récupérer:', tripIds);
+      // console.log('🚌 Trip IDs à récupérer:', tripIds);
       
       if (tripIds.length === 0) {
         console.warn('⚠️ Aucun trip_id trouvé dans les réservations');
@@ -853,8 +885,8 @@ export const bookingService = {
         `)
         .in('id', tripIds)
 
-      console.log('🚌 Trajets récupérés:', tripsData);
-      console.log('🚌 Erreur trajets:', tripsError);
+      // console.log('🚌 Trajets récupérés:', tripsData);
+      // console.log('🚌 Erreur trajets:', tripsError);
 
       if (tripsError) {
         console.warn('Erreur lors de la récupération des trajets:', tripsError)
