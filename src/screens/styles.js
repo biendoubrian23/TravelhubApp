@@ -48,6 +48,57 @@ export default StyleSheet.create({
   lastSection: {
     marginBottom: 100,
   },
+
+  // Nouveaux styles pour la réorganisation
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 15,
+    marginHorizontal: 20,
+    letterSpacing: -0.3,
+  },
+  
+  // Section combinée services
+  combinedSection: {
+    marginVertical: 15,
+  },
+  servicesGrid: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    justifyContent: 'space-between',
+  },
+  serviceGridItem: {
+    width: '30%',
+  },
+  
+  // Section compagnies en grille
+  companiesSection: {
+    marginVertical: 15,
+  },
+  companiesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 20,
+    justifyContent: 'space-between',
+  },
+  companyGridItem: {
+    width: '48%',
+    marginBottom: 12,
+  },
+  
+  // Section offres spéciales horizontale
+  offersSection: {
+    marginVertical: 15,
+    marginBottom: 100,
+  },
+  offersHorizontal: {
+    paddingHorizontal: 20,
+  },
+  offerItem: {
+    width: 250,
+    marginRight: 15,
+  },
   
   // Featured Cards - Style similaire aux destinations
   featuredCard: {
@@ -298,11 +349,11 @@ export default StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Service Cards
+  // Service Cards - Adaptées pour la grille
   serviceCard: {
-    height: 140,
-    borderRadius: 16,
-    padding: 20,
+    height: 120,
+    borderRadius: 12,
+    padding: 16,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -315,15 +366,15 @@ export default StyleSheet.create({
     elevation: 2,
   },
   serviceTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#ffffff',
     textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: 8,
+    marginBottom: 2,
   },
   serviceSubtitle: {
-    fontSize: 13,
+    fontSize: 11,
     color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
   },

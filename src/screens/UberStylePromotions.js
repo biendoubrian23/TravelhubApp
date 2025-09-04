@@ -256,7 +256,7 @@ const UberStylePromotions = () => {
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
     >
-      <Ionicons name={item.icon} size={32} color="#fff" />
+      <Ionicons name={item.icon} size={24} color="#fff" />
       <Text style={styles.serviceTitle}>{item.title}</Text>
       <Text style={styles.serviceSubtitle}>{item.subtitle}</Text>
     </LinearGradient>
@@ -319,7 +319,7 @@ const UberStylePromotions = () => {
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
-        {/* Offres vedettes */}
+        {/* Offres vedettes - Carrousel principal */}
         <ModernCarousel
           title="Offres vedettes"
           data={featuredOffers}
@@ -328,7 +328,7 @@ const UberStylePromotions = () => {
           containerStyle={styles.sectionContainer}
         />
 
-        {/* Destinations populaires */}
+        {/* Destinations populaires - Carrousel */}
         <ModernCarousel
           title="Destinations populaires"
           data={popularDestinations}
@@ -337,42 +337,55 @@ const UberStylePromotions = () => {
           containerStyle={styles.sectionContainer}
         />
 
-        {/* Compagnies partenaires */}
+        {/* Section combinée - Services + Compagnies en grille */}
+        <View style={styles.combinedSection}>
+          <Text style={styles.sectionTitle}>Nos services</Text>
+          <View style={styles.servicesGrid}>
+            {services.map((service, index) => (
+              <View key={index} style={styles.serviceGridItem}>
+                {renderServiceCard(service)}
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Compagnies partenaires - Layout en grille 2x2 */}
+        <View style={styles.companiesSection}>
+          <Text style={styles.sectionTitle}>Compagnies partenaires</Text>
+          <View style={styles.companiesGrid}>
+            {busCompanies.slice(0, 4).map((company, index) => (
+              <View key={index} style={styles.companyGridItem}>
+                {renderCompanyCard(company)}
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Témoignages - Un seul carrousel plus compact */}
         <ModernCarousel
-          title="Compagnies partenaires"
-          data={busCompanies}
-          renderItem={renderCompanyCard}
-          autoScroll={false}
+          title="Avis clients"
+          data={testimonials}
+          renderItem={renderTestimonialCard}
+          autoScroll={true}
           showDots={false}
           containerStyle={styles.sectionContainer}
         />
 
-        {/* Services inclus */}
-        <ModernCarousel
-          title="Services inclus"
-          data={services}
-          renderItem={renderServiceCard}
-          autoScroll={true}
-          containerStyle={styles.sectionContainer}
-        />
-
-        {/* Témoignages clients */}
-        <ModernCarousel
-          title="Ce que disent nos clients"
-          data={testimonials}
-          renderItem={renderTestimonialCard}
-          autoScroll={true}
-          containerStyle={styles.sectionContainer}
-        />
-
-        {/* Offres saisonnières */}
-        <ModernCarousel
-          title="Offres limitées"
-          data={seasonalOffers}
-          renderItem={renderSeasonalCard}
-          autoScroll={false}
-          containerStyle={[styles.sectionContainer, styles.lastSection]}
-        />
+        {/* Offres spéciales - Layout horizontal simple */}
+        <View style={styles.offersSection}>
+          <Text style={styles.sectionTitle}>Offres limitées</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.offersHorizontal}
+          >
+            {seasonalOffers.map((offer, index) => (
+              <View key={index} style={styles.offerItem}>
+                {renderSeasonalCard(offer)}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
