@@ -72,7 +72,8 @@ const DriverDashboard = ({ navigation }) => {
             seat_number,
             booking_status,
             total_price_fcfa
-          )
+          ),
+          drivers:agency_employee_invitations(id, first_name, last_name, email)
         `)
         .gte('departure_time', format(selectedDate, 'yyyy-MM-dd'))
         .lt('departure_time', format(addDays(selectedDate, 1), 'yyyy-MM-dd'))
@@ -92,36 +93,34 @@ const DriverDashboard = ({ navigation }) => {
         route: `${trip.departure_city} → ${trip.arrival_city}`
       })));
       
+      // Déboguer les informations des conducteurs
       if (tripsWithDrivers.length > 0) {
-        const driverIds = [...new Set(tripsWithDrivers.map(trip => trip.driver_id).filter(Boolean))];
-        console.log('🔍 Driver IDs trouvés:', driverIds);
-        console.log('🔍 ID utilisateur connecté:', user?.id);
-        
-        if (driverIds.length > 0) {
-          const { data: driversData, error: driversError } = await supabase
-            .from('users')
-            .select('id, full_name, email')
-            .in('id', driverIds);
-
-          console.log('🔍 Conducteurs trouvés:', driversData);
-          console.log('🔍 Erreur conducteurs:', driversError);
-
-          if (!driversError && driversData) {
-            // Associer les conducteurs aux trajets
-            tripsWithDrivers = tripsWithDrivers.map(trip => ({
-              ...trip,
-              driver: driversData.find(driver => driver.id === trip.driver_id) || null
-            }));
+        console.log('🔍 Debug - Informations des conducteurs:');
+        tripsWithDrivers.forEach(trip => {
+          console.log(`Trip ID ${trip.id}: driver_id = ${trip.driver_id || 'NULL'}`);
+          
+          if (trip.driver_id && trip.drivers) {
+            const driverData = trip.drivers;
+            console.log('  Driver Info:', {
+              id: trip.driver_id,
+              driverData: driverData,
+              first_name: Array.isArray(driverData) ? driverData[0]?.first_name : driverData?.first_name,
+              last_name: Array.isArray(driverData) ? driverData[0]?.last_name : driverData?.last_name,
+              email: Array.isArray(driverData) ? driverData[0]?.email : driverData?.email
+            });
           }
-        }
+        });
+        
+        // Afficher un résumé
+        const driversFound = tripsWithDrivers.filter(t => t.driver_id).length;
+        console.log(`🚕 Résumé: ${driversFound}/${tripsWithDrivers.length} trajets ont des driver_id assignés`);
       }
 
-      // Debug : Afficher tous les trajets avec leurs conducteurs
+      // Debug : Afficher tous les trajets avec leurs driver_id
       console.log('🚛 Trajets du jour:', tripsWithDrivers?.map(trip => ({
         id: trip.id,
         route: `${trip.departure_city} → ${trip.arrival_city}`,
         driver_id: trip.driver_id,
-        driver_name: trip.driver?.full_name,
         isMyTrip: trip.driver_id === user?.id
       })));
 
@@ -187,7 +186,7 @@ const DriverDashboard = ({ navigation }) => {
     console.log('🔍 Clic sur trajet:', {
       tripId: trip.id,
       route: `${trip.departure_city} → ${trip.arrival_city}`,
-      driverName: trip.driver?.full_name || 'Non défini'
+      driverId: trip.driver_id || 'Non défini'
     });
 
     console.log('✅ Ouverture de la liste des passagers');
@@ -228,6 +227,24 @@ const DriverDashboard = ({ navigation }) => {
   const renderTripCard = (trip) => {
     const confirmedBookings = trip.bookings?.filter(b => b.booking_status === 'confirmed') || [];
     
+    // Obtenir les informations du conducteur
+    let driverInfo = "Non assigné";
+    
+    if (trip.driver_id && trip.drivers) {
+      if (Array.isArray(trip.drivers) && trip.drivers.length > 0) {
+        const driverData = trip.drivers[0];
+        if (driverData && driverData.first_name && driverData.last_name) {
+          driverInfo = `${driverData.first_name} ${driverData.last_name}`;
+        }
+      } else if (trip.drivers && trip.drivers.first_name && trip.drivers.last_name) {
+        driverInfo = `${trip.drivers.first_name} ${trip.drivers.last_name}`;
+      }
+      
+      if (driverInfo === "Non assigné") {
+        driverInfo = `ID: ${trip.driver_id}`;
+      }
+    }
+    
     return (
       <TouchableOpacity
         key={trip.id}
@@ -265,6 +282,17 @@ const DriverDashboard = ({ navigation }) => {
             />
             <Text style={styles.busType}>
               {trip.bus_type === 'vip' ? 'VIP' : 'Classique'}
+            </Text>
+          </View>
+          
+          <View style={styles.driverInfo}>
+            <Ionicons 
+              name="person" 
+              size={14} 
+              color="#6B7280" 
+            />
+            <Text style={styles.driverName}>
+              {driverInfo}
             </Text>
           </View>
           
@@ -307,76 +335,118 @@ const DriverDashboard = ({ navigation }) => {
     );
   };
 
-  const renderPassengersModal = () => (
-    <Modal
-      visible={passengersModalVisible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={() => setPassengersModalVisible(false)}
-    >
-      <View style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>
-            Passagers - {selectedTrip?.departure_city} → {selectedTrip?.arrival_city}
-          </Text>
-          <TouchableOpacity
-            onPress={() => setPassengersModalVisible(false)}
-            style={styles.closeButton}
-          >
-            <Ionicons name="close" size={24} color="#6B7280" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Barre de recherche */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchInputContainer}>
-            <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Rechercher un passager..."
-              value={searchQuery}
-              onChangeText={filterPassengers}
-              placeholderTextColor="#9CA3AF"
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity
-                onPress={() => filterPassengers('')}
-                style={styles.clearButton}
-              >
-                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
-              </TouchableOpacity>
-            )}
+  const renderPassengersModal = () => {
+    // Obtenir les informations du conducteur pour le trajet sélectionné
+    let driverInfo = "Non assigné";
+    
+    if (selectedTrip?.driver_id && selectedTrip?.drivers) {
+      if (Array.isArray(selectedTrip.drivers) && selectedTrip.drivers.length > 0) {
+        const driverData = selectedTrip.drivers[0];
+        if (driverData && driverData.first_name && driverData.last_name) {
+          driverInfo = `${driverData.first_name} ${driverData.last_name}`;
+        }
+      } else if (selectedTrip.drivers && selectedTrip.drivers.first_name && selectedTrip.drivers.last_name) {
+        driverInfo = `${selectedTrip.drivers.first_name} ${selectedTrip.drivers.last_name}`;
+      }
+      
+      if (driverInfo === "Non assigné") {
+        driverInfo = `ID: ${selectedTrip.driver_id}`;
+      }
+    }
+    
+    return (
+      <Modal
+        visible={passengersModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setPassengersModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              {selectedTrip?.departure_city} → {selectedTrip?.arrival_city}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setPassengersModalVisible(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#6B7280" />
+            </TouchableOpacity>
           </View>
-        </View>
 
-        <ScrollView style={styles.passengersList}>
-          {filteredPassengers.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={60} color="#9CA3AF" />
-              <Text style={styles.emptyStateText}>
-                {searchQuery ? 'Aucun passager trouvé' : 'Aucun passager confirmé'}
-              </Text>
+          {/* Informations sur le trajet */}
+          <View style={styles.tripInfoCard}>
+            <View style={styles.tripInfoRow}>
+              <View style={styles.tripInfoItem}>
+                <Text style={styles.tripInfoLabel}>Date</Text>
+                <Text style={styles.tripInfoValue}>
+                  {selectedTrip ? format(new Date(selectedTrip.departure_time), 'dd/MM/yyyy', { locale: fr }) : '-'}
+                </Text>
+              </View>
+              <View style={styles.tripInfoItem}>
+                <Text style={styles.tripInfoLabel}>Heure départ</Text>
+                <Text style={styles.tripInfoValue}>
+                  {selectedTrip ? format(new Date(selectedTrip.departure_time), 'HH:mm', { locale: fr }) : '-'}
+                </Text>
+              </View>
+              <View style={styles.tripInfoItem}>
+                <Text style={styles.tripInfoLabel}>Conducteur</Text>
+                <Text style={styles.tripInfoValue}>{driverInfo}</Text>
+              </View>
             </View>
-          ) : (
-            filteredPassengers.map((passenger, index) => (
-              <View key={passenger.id} style={styles.passengerCard}>
-                <View style={styles.passengerInfo}>
-                  <View style={styles.passengerDetails}>
-                    <Text style={styles.passengerName}>{passenger.passenger_name}</Text>
-                    <Text style={styles.passengerPhone}>{passenger.passenger_phone}</Text>
+          </View>
+
+          {/* Barre de recherche */}
+          <View style={styles.searchContainer}>
+            <View style={styles.searchInputContainer}>
+              <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Rechercher un passager..."
+                value={searchQuery}
+                onChangeText={filterPassengers}
+                placeholderTextColor="#9CA3AF"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => filterPassengers('')}
+                  style={styles.clearButton}
+                >
+                  <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          <ScrollView style={styles.passengersList}>
+            {filteredPassengers.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="people-outline" size={60} color="#9CA3AF" />
+                <Text style={styles.emptyStateText}>
+                  {searchQuery ? 'Aucun passager trouvé' : 'Aucun passager confirmé'}
+                </Text>
+              </View>
+            ) : (
+              filteredPassengers.map((passenger, index) => (
+                <View key={passenger.id} style={styles.passengerCard}>
+                  <View style={styles.passengerInfo}>
+                    <View style={styles.passengerDetails}>
+                      <Text style={styles.passengerName}>{passenger.passenger_name}</Text>
+                      <Text style={styles.passengerPhone}>{passenger.passenger_phone}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.seatBadge}>
+                    <Text style={styles.seatText}>{passenger.seat_number}</Text>
                   </View>
                 </View>
-                
-                <View style={styles.seatBadge}>
-                  <Text style={styles.seatText}>{passenger.seat_number}</Text>
-                </View>
-              </View>
-            ))
-          )}
-        </ScrollView>
-      </View>
-    </Modal>
-  );
+              ))
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -389,9 +459,9 @@ const DriverDashboard = ({ navigation }) => {
       >
         <View style={styles.headerContent}>
           <View>
-            <Text style={styles.greeting}>Bonjour,</Text>
+            <Text style={styles.greeting}>Bienvenue,</Text>
             <Text style={styles.driverName}>
-              {user?.user_metadata?.nom || 'Conducteur'} {user?.user_metadata?.prenom || ''}
+              {user?.user_metadata?.nom || user?.user_metadata?.first_name || 'Conducteur'} {user?.user_metadata?.prenom || user?.user_metadata?.last_name || ''}
             </Text>
           </View>
           <TouchableOpacity 
@@ -699,21 +769,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
   },
   busInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
   },
   busType: {
     fontSize: 14,
     fontWeight: '500',
     color: '#4F46E5',
   },
+  driverInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  driverName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
+    textAlign: 'center',
+    flex: 1,
+    overflow: 'hidden',
+  },
   priceText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#059669',
+    textAlign: 'right',
   },
   modalContainer: {
     flex: 1,
@@ -819,6 +907,31 @@ const styles = StyleSheet.create({
   clearButton: {
     marginLeft: 8,
     padding: 4,
+  },
+  tripInfoCard: {
+    backgroundColor: '#F3F4F6',
+    padding: 16,
+    margin: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4F46E5',
+  },
+  tripInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  tripInfoItem: {
+    flex: 1,
+  },
+  tripInfoLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  tripInfoValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
   },
 });
 
