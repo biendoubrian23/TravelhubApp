@@ -494,7 +494,10 @@ export const balanceService = {
       
       console.log('🚀 Création réservations via bookingService:', bookingData);
       
-      const result = await bookingService.createMultipleBookings(bookingData);
+      const result = await bookingService.createMultipleBookings(bookingData, {
+        isPartOfMixedPayment: false,  // Paiement complet par solde
+        skipSeatReservation: false    // Réserver les sièges normalement
+      });
       
       if (result.success && result.bookings) {
         // Débiter le solde après création réussie des réservations

@@ -126,8 +126,24 @@ const PaymentScreen = ({ route, navigation }) => {
         mappedSeats
       });
       
-      // Étape 2: Débiter le solde d'abord
+      // Étape 2: Réserver les sièges d'abord (sans créer les réservations)
       if (amountFromBalance > 0) {
+        // Réserver les sièges seulement
+        const { busService } = require('../../services/busService');
+        const reserveSeatsResult = await busService.reserveSeatsTemporarily(
+          trip?.id || outboundTrip?.id,
+          mappedSeats
+        );
+        
+        if (!reserveSeatsResult.success) {
+          Alert.alert('Erreur', 'Impossible de réserver les sièges. Veuillez réessayer.');
+          setProcessing(false);
+          return;
+        }
+        
+        console.log('✅ Sièges réservés temporairement');
+        
+        // Débiter le solde après réservation des sièges
         const debitResult = await balanceService.debitBalance(
           user.id,
           amountFromBalance,
@@ -136,6 +152,8 @@ const PaymentScreen = ({ route, navigation }) => {
         );
         
         if (!debitResult.success) {
+          // En cas d'échec, libérer les sièges
+          await busService.releaseSeatsTemporarily(trip?.id || outboundTrip?.id, mappedSeats);
           Alert.alert('Erreur', 'Échec du débit du solde. Veuillez réessayer.');
           setProcessing(false);
           return;
@@ -154,7 +172,7 @@ const PaymentScreen = ({ route, navigation }) => {
         console.log('✅ Paiement mobile money simulé avec succès');
       }
       
-      // Étape 4: Créer la réservation avec les informations complètes
+      // Étape 4: Créer les réservations une seule fois avec toutes les informations de paiement
       const bookingData = {
         userId: user?.id,
         tripId: trip?.id || outboundTrip?.id,
@@ -169,9 +187,13 @@ const PaymentScreen = ({ route, navigation }) => {
         }
       };
       
-      console.log('🚀 Création réservation paiement mixte:', bookingData);
+      console.log('🚀 Création réservation paiement mixte (une seule fois):', bookingData);
       
-      const result = await bookingService.createMultipleBookings(bookingData);
+      // Créer les réservations avec option pour utiliser les sièges déjà réservés
+      const result = await bookingService.createMultipleBookings(bookingData, {
+        skipSeatReservation: true, // Ne pas réserver les sièges à nouveau car déjà fait
+        seatsAlreadyReserved: true // Indiquer que les sièges sont déjà réservés
+      });
       
       if (result.success) {
         // Fermer le modal
@@ -216,9 +238,10 @@ const PaymentScreen = ({ route, navigation }) => {
           );
         }
         
-        // Libérer les sièges en cas d'échec (ils ont pu être marqués comme occupés)
-        console.log('🔄 Tentative de libération des sièges suite à l\'échec...');
-        // Note: La logique de libération est maintenant dans bookingService.createMultipleBookings
+        // Libérer les sièges en cas d'échec
+        console.log('🔄 Libération des sièges suite à l\'échec...');
+        const { busService } = require('../../services/busService');
+        await busService.releaseSeatsTemporarily(trip?.id || outboundTrip?.id, mappedSeats);
       }
     } catch (error) {
       console.error('❌ Erreur lors du paiement mixte:', error);
@@ -228,6 +251,7 @@ const PaymentScreen = ({ route, navigation }) => {
       try {
         const { useAuthStore } = require('../../store');
         const { balanceService } = require('../../services/balanceService');
+        const { busService } = require('../../services/busService');
         const { user } = useAuthStore.getState();
         const amountFromBalance = Math.min(userBalance, totalPrice);
         
@@ -239,6 +263,10 @@ const PaymentScreen = ({ route, navigation }) => {
             'Remboursement suite à erreur de paiement'
           );
         }
+        
+        // Libérer les sièges si ils ont été réservés
+        console.log('🔄 Libération des sièges suite à erreur...');
+        await busService.releaseSeatsTemporarily(trip?.id || outboundTrip?.id, mappedSeats);
       } catch (refundError) {
         console.error('❌ Erreur lors du remboursement:', refundError);
       }

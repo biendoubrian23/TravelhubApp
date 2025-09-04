@@ -375,5 +375,74 @@ export const busService = {
       console.error('Erreur dans autoReserveSeats:', error)
       throw error
     }
+  },
+
+  // Réserver temporairement des sièges pour un paiement mixte
+  async reserveSeatsTemporarily(tripId, seatNumbers) {
+    try {
+      console.log('🔄 Réservation temporaire des sièges:', { tripId, seatNumbers });
+      
+      // Vérifier que les sièges sont disponibles
+      const { data: existingSeats, error: seatCheckError } = await supabase
+        .from('seat_maps')
+        .select('seat_number, is_available')
+        .eq('trip_id', tripId)
+        .in('seat_number', seatNumbers);
+
+      if (seatCheckError) {
+        console.error('❌ Erreur vérification sièges:', seatCheckError);
+        return { success: false, error: 'Impossible de vérifier la disponibilité des sièges' };
+      }
+
+      const unavailableSeats = existingSeats?.filter(seat => !seat.is_available) || [];
+      if (unavailableSeats.length > 0) {
+        return { 
+          success: false, 
+          error: `Sièges déjà occupés: ${unavailableSeats.map(s => s.seat_number).join(', ')}` 
+        };
+      }
+
+      // Marquer les sièges comme occupés
+      const { error: reserveError } = await supabase
+        .from('seat_maps')
+        .update({ is_available: false })
+        .eq('trip_id', tripId)
+        .in('seat_number', seatNumbers);
+
+      if (reserveError) {
+        console.error('❌ Erreur réservation sièges:', reserveError);
+        return { success: false, error: 'Impossible de réserver les sièges' };
+      }
+
+      console.log('✅ Sièges réservés temporairement:', seatNumbers.join(', '));
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Erreur réservation temporaire:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Libérer les sièges réservés temporairement en cas d'échec
+  async releaseSeatsTemporarily(tripId, seatNumbers) {
+    try {
+      console.log('🔄 Libération des sièges:', { tripId, seatNumbers });
+      
+      const { error: releaseError } = await supabase
+        .from('seat_maps')
+        .update({ is_available: true })
+        .eq('trip_id', tripId)
+        .in('seat_number', seatNumbers);
+
+      if (releaseError) {
+        console.error('❌ Erreur libération sièges:', releaseError);
+        return { success: false, error: 'Impossible de libérer les sièges' };
+      }
+
+      console.log('✅ Sièges libérés:', seatNumbers.join(', '));
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Erreur libération sièges:', error);
+      return { success: false, error: error.message };
+    }
   }
 }

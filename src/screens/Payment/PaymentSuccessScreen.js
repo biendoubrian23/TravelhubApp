@@ -148,8 +148,8 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
               console.log(`✅ Réservations ${paymentType} trouvées:`, savedBookings.length);
             }
           }
-        } else {
-          // Fallback : ancien système de simulation avec création de réservation
+        } else if (paymentType !== 'mixed_payment') {
+          // Fallback : ancien système de simulation avec création de réservation (SAUF paiements mixtes)
           console.log('🔄 Fallback - création de réservation classique');
           
           // Ajoutons des logs pour debug

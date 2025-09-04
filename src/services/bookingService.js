@@ -72,10 +72,16 @@ export const bookingService = {
   },
 
   // Créer plusieurs réservations (une par siège)
-  async createMultipleBookings(bookingData) {
+  async createMultipleBookings(bookingData, options = {}) {
+    let finalSeatNumbers = [];
+    
     try {
       logger.info('=== DÉBUT CRÉATION RÉSERVATIONS MULTIPLES ===');
       logger.log('Données reçues:', bookingData);
+      logger.log('Options:', options);
+      
+      // Récupérer les options pour le paiement mixte
+      const { isPartOfMixedPayment = false, skipSeatReservation = false, seatsAlreadyReserved = false } = options;
       
       // Validation des données essentielles
       if (!bookingData.tripId || !bookingData.userId) {
@@ -117,8 +123,6 @@ export const bookingService = {
       }
 
       console.log('👤 Informations utilisateur récupérées:', userData);
-      
-      let finalSeatNumbers = [];
       
       // Gérer l'attribution des sièges
       console.log('🪑 Analyse des sièges reçus:');
@@ -174,127 +178,138 @@ export const bookingService = {
 
       console.log('Sièges à réserver:', finalSeatNumbers);
 
-      // Vérifier que les sièges existent et sont disponibles
-      console.log('🔍 Vérification des sièges avant réservation...');
-      console.log('- Trip ID:', bookingData.tripId, 'Type:', typeof bookingData.tripId);
-      console.log('- Sièges à vérifier:', finalSeatNumbers, 'Types:', finalSeatNumbers.map(s => typeof s));
-      
-      // DEBUG: Construire manuellement la requête pour voir ce qui se passe
-      console.log('🔎 Requête SQL équivalente:');
-      console.log(`SELECT seat_number, is_available FROM seat_maps WHERE trip_id = '${bookingData.tripId}' AND seat_number IN (${finalSeatNumbers.map(s => `'${s}'`).join(', ')})`);
-      
-      const { data: existingSeats, error: seatCheckError } = await supabase
-        .from('seat_maps')
-        .select('seat_number, is_available')
-        .eq('trip_id', bookingData.tripId)
-        .in('seat_number', finalSeatNumbers);
+      // Debug des options reçues
+      console.log('🔧 Options de réservation:', { skipSeatReservation, seatsAlreadyReserved });
 
-      console.log('📋 Résultat requête seat_maps:', existingSeats);
-      console.log('- Nombre de sièges trouvés:', existingSeats?.length || 0);
-      console.log('- Détails par siège:');
-      existingSeats?.forEach(seat => {
-        console.log(`  • Siège ${seat.seat_number}: ${seat.is_available ? 'DISPONIBLE' : 'OCCUPÉ'}`);
-      });
-
-      if (seatCheckError) {
-        console.error('❌ Erreur requête seat_maps:', seatCheckError);
-        throw new Error('Impossible de vérifier la disponibilité des sièges');
-      }
-
-      const unavailableSeats = existingSeats?.filter(seat => !seat.is_available) || [];
-      if (unavailableSeats.length > 0) {
-        console.log('⚠️ Sièges marqués comme occupés détectés:', unavailableSeats.map(s => s.seat_number));
+      // Vérifier que les sièges existent et sont disponibles - sauf si option skipSeatReservation est activée
+      if (!skipSeatReservation && !seatsAlreadyReserved) {
+        console.log('🔍 Vérification des sièges avant réservation...');
+        console.log('- Trip ID:', bookingData.tripId, 'Type:', typeof bookingData.tripId);
+        console.log('- Sièges à vérifier:', finalSeatNumbers, 'Types:', finalSeatNumbers.map(s => typeof s));
         
-        // 🔍 VÉRIFICATION AVANCÉE : Vérifier s'il y a vraiment des réservations pour ces sièges
-        console.log('🔍 Vérification des réservations existantes pour ces sièges...');
+        // DEBUG: Construire manuellement la requête pour voir ce qui se passe
+        console.log('🔎 Requête SQL équivalente:');
+        console.log(`SELECT seat_number, is_available FROM seat_maps WHERE trip_id = '${bookingData.tripId}' AND seat_number IN (${finalSeatNumbers.map(s => `'${s}'`).join(', ')})`);
         
-        const { data: existingBookings, error: bookingCheckError } = await supabase
-          .from('bookings')
-          .select('seat_number, booking_status')
+        const { data: existingSeats, error: seatCheckError } = await supabase
+          .from('seat_maps')
+          .select('seat_number, is_available')
           .eq('trip_id', bookingData.tripId)
-          .in('seat_number', unavailableSeats.map(s => s.seat_number))
-          .in('booking_status', ['confirmed', 'pending']); // Seulement les réservations actives
-          
-        console.log('📋 Réservations trouvées:', existingBookings);
-        
-        if (bookingCheckError) {
-          console.error('❌ Erreur vérification réservations:', bookingCheckError);
-          // En cas d'erreur, on garde le comportement par défaut
-          throw new Error(`Sièges déjà occupés: ${unavailableSeats.map(s => s.seat_number).join(', ')}`);
+          .in('seat_number', finalSeatNumbers);
+
+        console.log('📋 Résultat requête seat_maps:', existingSeats);
+        console.log('- Nombre de sièges trouvés:', existingSeats?.length || 0);
+        console.log('- Détails par siège:');
+        existingSeats?.forEach(seat => {
+          console.log(`  • Siège ${seat.seat_number}: ${seat.is_available ? 'DISPONIBLE' : 'OCCUPÉ'}`);
+        });
+
+        if (seatCheckError) {
+          console.error('❌ Erreur requête seat_maps:', seatCheckError);
+          throw new Error('Impossible de vérifier la disponibilité des sièges');
         }
-        
-        // Identifier les sièges "fantômes" (marqués occupés mais sans réservation active)
-        const seatsWithBookings = existingBookings?.map(b => b.seat_number) || [];
-        const ghostSeats = unavailableSeats.filter(seat => 
-          !seatsWithBookings.includes(seat.seat_number)
-        );
-        
-        if (ghostSeats.length > 0) {
-          console.log('👻 Sièges fantômes détectés (occupés sans réservation):', ghostSeats.map(s => s.seat_number));
-          console.log('🔄 Libération automatique des sièges fantômes...');
+
+        const unavailableSeats = existingSeats?.filter(seat => !seat.is_available) || [];
+        if (unavailableSeats.length > 0) {
+          console.log('⚠️ Sièges marqués comme occupés détectés:', unavailableSeats.map(s => s.seat_number));
           
-          // Libérer les sièges fantômes
-          const { error: cleanupError } = await supabase
-            .from('seat_maps')
-            .update({ is_available: true })
+          // 🔍 VÉRIFICATION AVANCÉE : Vérifier s'il y a vraiment des réservations pour ces sièges
+          console.log('🔍 Vérification des réservations existantes pour ces sièges...');
+          
+          const { data: existingBookings, error: bookingCheckError } = await supabase
+            .from('bookings')
+            .select('seat_number, booking_status')
             .eq('trip_id', bookingData.tripId)
-            .in('seat_number', ghostSeats.map(s => s.seat_number));
+            .in('seat_number', unavailableSeats.map(s => s.seat_number))
+            .in('booking_status', ['confirmed', 'pending']); // Seulement les réservations actives
             
-          if (cleanupError) {
-            console.error('❌ Erreur lors du nettoyage des sièges fantômes:', cleanupError);
-          } else {
-            console.log('✅ Sièges fantômes libérés:', ghostSeats.map(s => s.seat_number).join(', '));
+          console.log('📋 Réservations trouvées:', existingBookings);
+          
+          if (bookingCheckError) {
+            console.error('❌ Erreur vérification réservations:', bookingCheckError);
+            // En cas d'erreur, on garde le comportement par défaut
+            throw new Error(`Sièges déjà occupés: ${unavailableSeats.map(s => s.seat_number).join(', ')}`);
           }
           
-          // Mettre à jour la liste des sièges non disponibles
-          const reallyUnavailableSeats = unavailableSeats.filter(seat => 
-            seatsWithBookings.includes(seat.seat_number)
+          // Identifier les sièges "fantômes" (marqués occupés mais sans réservation active)
+          const seatsWithBookings = existingBookings?.map(b => b.seat_number) || [];
+          const ghostSeats = unavailableSeats.filter(seat => 
+            !seatsWithBookings.includes(seat.seat_number)
           );
           
-          if (reallyUnavailableSeats.length > 0) {
-            throw new Error(`Sièges déjà occupés: ${reallyUnavailableSeats.map(s => s.seat_number).join(', ')}`);
+          if (ghostSeats.length > 0) {
+            console.log('👻 Sièges fantômes détectés (occupés sans réservation):', ghostSeats.map(s => s.seat_number));
+            console.log('🔄 Libération automatique des sièges fantômes...');
+            
+            // Libérer les sièges fantômes
+            const { error: cleanupError } = await supabase
+              .from('seat_maps')
+              .update({ is_available: true })
+              .eq('trip_id', bookingData.tripId)
+              .in('seat_number', ghostSeats.map(s => s.seat_number));
+              
+            if (cleanupError) {
+              console.error('❌ Erreur lors du nettoyage des sièges fantômes:', cleanupError);
+            } else {
+              console.log('✅ Sièges fantômes libérés:', ghostSeats.map(s => s.seat_number).join(', '));
+            }
+            
+            // Mettre à jour la liste des sièges non disponibles
+            const reallyUnavailableSeats = unavailableSeats.filter(seat => 
+              seatsWithBookings.includes(seat.seat_number)
+            );
+            
+            if (reallyUnavailableSeats.length > 0) {
+              throw new Error(`Sièges déjà occupés: ${reallyUnavailableSeats.map(s => s.seat_number).join(', ')}`);
+            }
+            
+            console.log('✅ Tous les sièges sont maintenant disponibles après nettoyage');
+          } else {
+            // Tous les sièges occupés ont vraiment des réservations
+            throw new Error(`Sièges déjà occupés: ${unavailableSeats.map(s => s.seat_number).join(', ')}`);
           }
-          
-          console.log('✅ Tous les sièges sont maintenant disponibles après nettoyage');
-        } else {
-          // Tous les sièges occupés ont vraiment des réservations
-          throw new Error(`Sièges déjà occupés: ${unavailableSeats.map(s => s.seat_number).join(', ')}`);
         }
       }
 
       // Marquer tous les sièges comme occupés d'abord
-      console.log('🔄 Marquage des sièges comme occupés...');
-      console.log('- Trip ID:', bookingData.tripId);
-      console.log('- Sièges à marquer:', finalSeatNumbers);
-      console.log('- Types des sièges:', finalSeatNumbers.map(s => `${s} (${typeof s})`));
-      
-      const { error: seatError } = await supabase
-        .from('seat_maps')
-        .update({ is_available: false })
-        .eq('trip_id', bookingData.tripId)
-        .in('seat_number', finalSeatNumbers);
-
-      if (seatError) {
-        console.error('❌ Erreur lors du marquage des sièges:', seatError);
-        throw new Error('Impossible de réserver les sièges sélectionnés');
-      }
-
-      console.log(`✅ Sièges ${finalSeatNumbers.join(', ')} marqués comme occupés`);
-      
-      // Vérification que les sièges sont bien marqués comme occupés
-      const { data: verificationSeats, error: verificationError } = await supabase
-        .from('seat_maps')
-        .select('seat_number, is_available')
-        .eq('trip_id', bookingData.tripId)
-        .in('seat_number', finalSeatNumbers);
+      if (!skipSeatReservation && !seatsAlreadyReserved) {
+        console.log('🔄 Marquage des sièges comme occupés...');
+        console.log('- Trip ID:', bookingData.tripId);
+        console.log('- Sièges à marquer:', finalSeatNumbers);
+        console.log('- Types des sièges:', finalSeatNumbers.map(s => `${s} (${typeof s})`));
         
-      console.log('🔍 Vérification post-marquage:', verificationSeats);
-      
-      if (verificationSeats) {
-        const stillAvailable = verificationSeats.filter(s => s.is_available);
-        if (stillAvailable.length > 0) {
-          console.warn('⚠️ Certains sièges sont encore disponibles:', stillAvailable);
+        const { error: seatError } = await supabase
+          .from('seat_maps')
+          .update({ is_available: false })
+          .eq('trip_id', bookingData.tripId)
+          .in('seat_number', finalSeatNumbers);
+
+        if (seatError) {
+          console.error('❌ Erreur lors du marquage des sièges:', seatError);
+          throw new Error('Impossible de réserver les sièges sélectionnés');
         }
+
+        console.log(`✅ Sièges ${finalSeatNumbers.join(', ')} marqués comme occupés`);
+        
+        // Vérification que les sièges sont bien marqués comme occupés
+        const { data: verificationSeats, error: verificationError } = await supabase
+          .from('seat_maps')
+          .select('seat_number, is_available')
+          .eq('trip_id', bookingData.tripId)
+          .in('seat_number', finalSeatNumbers);
+          
+        console.log('🔍 Vérification post-marquage:', verificationSeats);
+        
+        if (verificationSeats) {
+          const stillAvailable = verificationSeats.filter(s => s.is_available);
+          if (stillAvailable.length > 0) {
+            console.warn('⚠️ Certains sièges sont encore disponibles:', stillAvailable);
+          }
+        }
+      } else if (seatsAlreadyReserved) {
+        console.log('⏩ Étape de réservation de sièges ignorée (seatsAlreadyReserved=true)');
+      } else {
+        console.log('⏩ Étape de réservation de sièges ignorée (skipSeatReservation=true)');
       }
 
       // Vérifier le parrainage AVANT de créer les réservations pour savoir si c'est la première
@@ -383,7 +398,7 @@ export const bookingService = {
       console.error('❌ ERREUR GÉNÉRALE createMultipleBookings:', error);
       
       // 🔧 ROLLBACK : Libérer les sièges marqués comme occupés en cas d'erreur
-      if (finalSeatNumbers && finalSeatNumbers.length > 0 && bookingData.tripId) {
+      if (finalSeatNumbers && finalSeatNumbers.length > 0 && bookingData.tripId && !seatsAlreadyReserved) {
         console.log('🔄 ROLLBACK : Libération des sièges suite à l\'erreur...');
         console.log('- Sièges à libérer:', finalSeatNumbers);
         console.log('- Trip ID:', bookingData.tripId);
