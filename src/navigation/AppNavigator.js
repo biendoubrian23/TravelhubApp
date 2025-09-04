@@ -55,6 +55,10 @@ import ReferralScreen from '../screens/Referral/ReferralScreen';
 import InvoicesScreen from '../screens/Invoices/InvoicesScreen';
 import InvoicePreviewScreen from '../screens/Invoices/InvoicePreviewScreen';
 
+// Driver Screens
+import DriverTabNavigator from '../screens/Driver/DriverTabNavigator';
+import TripDetailsScreen from '../screens/Driver/TripDetailsScreen';
+
 // Store
 import { useAuthStore } from '../store'
 import { COLORS } from '../constants'
@@ -196,11 +200,21 @@ const AppNavigator = () => {
   }
   */
 
-  console.log('🔍 AppNavigator - État auth:', { 
-    isAuthenticated, 
-    hasUser: !!user,
-    userEmail: user?.email 
-  });
+  // console.log('🔍 AppNavigator - État auth:', { 
+  //   isAuthenticated, 
+  //   hasUser: !!user,
+  //   userEmail: user?.email,
+  //   userRole: user?.role || user?.profile?.role || user?.user_metadata?.role
+  // });
+
+  // Déterminer le rôle de l'utilisateur
+  const getUserRole = () => {
+    if (!user) return null;
+    return user?.role || user?.profile?.role || user?.user_metadata?.role || 'client';
+  };
+
+  const userRole = getUserRole();
+  console.log('👤 Rôle utilisateur détecté:', userRole);
 
   // Thème de navigation forcé en mode clair
   const lightNavigationTheme = {
@@ -225,65 +239,86 @@ const AppNavigator = () => {
         }}
       >
         {isAuthenticated && user ? (
-          // Interface utilisateur connecté
+          // Interface basée sur le rôle de l'utilisateur
           <>
-            <Stack.Screen 
-              name="ClientMain" 
-              component={ClientTabNavigator}
-              options={{ headerShown: false }}
-            />
-            
-            {/* Booking Screens */}
-            <Stack.Screen 
-              name="BookingDetails" 
-              component={BookingDetailsScreen}
-              options={{
-                title: 'Détails de la réservation',
-                presentation: 'card',
-                animationTypeForReplace: 'push',
-              }}
-            />
-            <Stack.Screen 
-              name="CancellationConfirmation" 
-              component={CancellationConfirmationScreen}
-              options={{
-                title: 'Annulation',
-                presentation: 'card',
-                animationTypeForReplace: 'push',
-              }}
-            />
+            {userRole === 'agency_driver' ? (
+              // Interface conducteur
+              <>
+                <Stack.Screen 
+                  name="DriverMain" 
+                  component={DriverTabNavigator}
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen 
+                  name="TripDetails" 
+                  component={TripDetailsScreen}
+                  options={{
+                    title: 'Détails du trajet',
+                    presentation: 'card',
+                    animationTypeForReplace: 'push',
+                  }}
+                />
+              </>
+            ) : (
+              // Interface client par défaut
+              <>
+                <Stack.Screen 
+                  name="ClientMain" 
+                  component={ClientTabNavigator}
+                  options={{ headerShown: false }}
+                />
+                
+                {/* Booking Screens */}
+                <Stack.Screen 
+                  name="BookingDetails" 
+                  component={BookingDetailsScreen}
+                  options={{
+                    title: 'Détails de la réservation',
+                    presentation: 'card',
+                    animationTypeForReplace: 'push',
+                  }}
+                />
+                <Stack.Screen 
+                  name="CancellationConfirmation" 
+                  component={CancellationConfirmationScreen}
+                  options={{
+                    title: 'Annulation',
+                    presentation: 'card',
+                    animationTypeForReplace: 'push',
+                  }}
+                />
 
-            {/* Profile Screens */}
-            <Stack.Screen 
-              name="EditProfile" 
-              component={EditProfileScreen}
-              options={{
-                title: 'Modifier le profil',
-                presentation: 'card',
-                animationTypeForReplace: 'push',
-              }}
-            />
-            <Stack.Screen 
-              name="NotificationSettings" 
-              component={NotificationSettingsScreen}
-              options={{
-                title: 'Notifications',
-                presentation: 'card',
-                animationTypeForReplace: 'push',
-              }}
-            />
-            <Stack.Screen 
-              name="Notifications" 
-              component={NotificationsScreen}
-              options={{
-                title: 'Mes Notifications',
-                presentation: 'card',
-                animationTypeForReplace: 'push',
-              }}
-            />
-            <Stack.Screen 
-              name="HelpSupport" 
-              component={HelpSupportScreen}
+                {/* Profile Screens */}
+                <Stack.Screen 
+                  name="EditProfile" 
+                  component={EditProfileScreen}
+                  options={{
+                    title: 'Modifier le profil',
+                    presentation: 'card',
+                    animationTypeForReplace: 'push',
+                  }}
+                />
+                <Stack.Screen 
+                  name="NotificationSettings" 
+                  component={NotificationSettingsScreen}
+                  options={{
+                    title: 'Notifications',
+                    presentation: 'card',
+                    animationTypeForReplace: 'push',
+                  }}
+                />
+                <Stack.Screen 
+                  name="Notifications" 
+                  component={NotificationsScreen}
+                  options={{
+                    title: 'Mes Notifications',
+                    presentation: 'card',
+                    animationTypeForReplace: 'push',
+                  }}
+                />
+                <Stack.Screen 
+                  name="HelpSupport" 
+                  component={HelpSupportScreen}
               options={{
                 title: 'Aide & Support',
                 presentation: 'card',
@@ -369,6 +404,8 @@ const AppNavigator = () => {
               }}
             />
           </>
+        )}  
+        </>
         ) : (
           // Interface utilisateur non connecté
           <>

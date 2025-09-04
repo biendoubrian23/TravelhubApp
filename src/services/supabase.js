@@ -130,13 +130,35 @@ export const authService = {
     }
   },
 
-  // Connexion
+  // Connexion avec récupération du profil
   async signIn(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    })
-    return { data, error }
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
+      
+      if (error) return { data, error }
+      
+      if (data?.user) {
+        // Récupérer le profil utilisateur pour le rôle
+        const { data: profile, error: profileError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', data.user.id)
+          .single()
+        
+        if (!profileError && profile) {
+          // Ajouter le profil aux données utilisateur
+          data.user.profile = profile
+          data.user.role = profile.role
+        }
+      }
+      
+      return { data, error }
+    } catch (error) {
+      return { data: null, error }
+    }
   },
 
   // Connexion Google
@@ -239,10 +261,35 @@ export const authService = {
     }
   },
 
-  // Récupérer l'utilisateur actuel
+  // Récupérer l'utilisateur actuel avec son profil
   async getCurrentUser() {
-    const { data: { user } } = await supabase.auth.getUser()
-    return user
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) return null
+      
+      // Récupérer le profil complet avec le rôle
+      const { data: profile, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+      
+      if (error) {
+        console.log('Profil non trouvé, utilisation des données de base')
+        return user
+      }
+      
+      // Fusionner les données auth avec le profil
+      return {
+        ...user,
+        profile,
+        role: profile?.role || user?.user_metadata?.role || 'client'
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération de l\'utilisateur:', error)
+      return null
+    }
   },
 
   // Écouter les changements d'auth
