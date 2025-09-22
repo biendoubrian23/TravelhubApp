@@ -374,7 +374,7 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
             <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.text.primary }}>
               {booking.trip.departure_city}
             </Text>
-            <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
+            <Text style={{ fontSize: 12, color: '#8B5CF6', fontWeight: 'bold' }}>
               {formatDate(booking.trip.departure_time, 'DD/MM à HH:mm')}
             </Text>
           </View>
@@ -390,7 +390,7 @@ const BookingsScreen = ({ navigation: routeNavigation }) => {
             <Text style={{ fontSize: 18, fontWeight: 'bold', color: COLORS.text.primary }}>
               {booking.trip.arrival_city}
             </Text>
-            <Text style={{ fontSize: 12, color: COLORS.text.secondary }}>
+            <Text style={{ fontSize: 12, color: '#8B5CF6', fontWeight: 'bold' }}>
               {formatDate(booking.trip.arrival_time, 'DD/MM à HH:mm')}
             </Text>
           </View>

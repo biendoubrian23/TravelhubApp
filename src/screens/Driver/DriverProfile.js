@@ -41,7 +41,7 @@ const DriverProfile = ({ navigation }) => {
     );
   };
 
-  // Interface simplifiée avec seulement 3 sections essentielles
+  // Interface simplifiée avec seulement 2 sections essentielles
   const profileSections = [
     {
       title: 'Disponibilité',
@@ -66,18 +66,6 @@ const DriverProfile = ({ navigation }) => {
           type: 'switch',
           value: notificationsEnabled,
           onToggle: setNotificationsEnabled,
-        },
-      ]
-    },
-    {
-      title: 'Documents',
-      items: [
-        {
-          icon: 'document-text-outline',
-          title: 'Permis et documents',
-          subtitle: 'Gérer tous mes documents',
-          type: 'navigation',
-          onPress: () => navigation.navigate('DriverDocuments'),
         },
       ]
     }

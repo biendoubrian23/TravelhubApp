@@ -464,15 +464,7 @@ const DriverDashboard = ({ navigation }) => {
               {user?.user_metadata?.nom || user?.user_metadata?.first_name || 'Conducteur'} {user?.user_metadata?.prenom || user?.user_metadata?.last_name || ''}
             </Text>
           </View>
-          <TouchableOpacity 
-            style={styles.notificationButton}
-            onPress={() => navigation.navigate('DriverNotifications')}
-          >
-            <Ionicons name="notifications-outline" size={24} color="white" />
-            <View style={styles.notificationBadge}>
-              <Text style={styles.badgeText}>3</Text>
-            </View>
-          </TouchableOpacity>
+          {/* Cloche de notification supprimée */}
         </View>
 
         {/* Stats Cards */}
@@ -578,26 +570,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 4,
   },
-  notificationButton: {
-    position: 'relative',
-    padding: 8,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: '#EF4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  /* Styles de notification supprimés */
   statsContainer: {
     flexDirection: 'row',
     gap: 16,
